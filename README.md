@@ -1,4 +1,4 @@
-# 口袋翻译 PocketLingo
+# 没网翻译 / Offline Translate
 
 完全离线的 iOS 翻译 app。Qwen3.5-0.8B 直接跑在设备上，文字不经过任何服务器。
 
@@ -68,7 +68,9 @@ open PocketLingo.xcodeproj
 - `.github/workflows/ci.yml` —— push / PR 时编译验证（模拟器，不签名）。
 - `.github/workflows/ios-testflight.yml` —— 手动触发，归档并上传 TestFlight。
 
-上传需要仓库 secrets：`ASC_KEY_ID`、`ASC_ISSUER_ID`、`ASC_API_KEY_P8`，以及 App Store Connect 里已经建好 bundle id 为 `io.argoodies.pocketlingo` 的 App 记录（这一步只能在网页端做，API 建不了）。
+上传需要仓库 secrets：`ASC_KEY_ID`、`ASC_ISSUER_ID`、`ASC_API_KEY_P8`。
+
+App Store Connect 侧复用已有的**没网翻译**记录（app `6815647930`，SKU `translator.offline.io.github.argoodies`）。它的 bundle id `dev.expo.client.cdk6asipshwbwfmintawzxd2uwcbu5iejxt3t4gqkoq4o` 是当初用 Expo 建记录时自动生成的占位串 —— 难看，但已经在 Developer Portal 注册好（identifier `WCU9XWSGJG`），而且用户看不到它。要换成正常的 id 只能去网页端改，API 不支持改 `bundleId`。
 
 两个 workflow 都把 `llama.xcframework` 按 `LLAMA_REF` 缓存，只有升级版本时才会重编。
 
