@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct TranslateView: View {
     @EnvironmentObject private var settings: AppSettings
@@ -7,7 +8,7 @@ struct TranslateView: View {
     @StateObject private var speech = SpeechReader()
 
     @AppStorage("sourceLanguageCode") private var sourceCode = ""
-    @AppStorage("targetLanguageCode") private var targetCode = TranslationLanguage.defaultPair().target.code
+    @AppStorage("targetLanguageCode") private var targetCode = TranslationLanguage.defaultTarget().code
 
     @State private var inputText = ""
     @State private var detectedLanguage: TranslationLanguage?

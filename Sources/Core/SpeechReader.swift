@@ -42,6 +42,12 @@ final class SpeechReader: NSObject, ObservableObject {
         isSpeaking = false
     }
 
+    /// 朗读结束后把音频会话让回去，否则别的 app 的音乐会一直保持在被压低的音量。
+    fileprivate func finishSpeaking() {
+        isSpeaking = false
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
     static func hasVoice(for language: TranslationLanguage) -> Bool {
         voice(for: language) != nil
     }
@@ -59,15 +65,13 @@ final class SpeechReader: NSObject, ObservableObject {
 extension SpeechReader: AVSpeechSynthesizerDelegate {
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         Task { @MainActor in
-            isSpeaking = false
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            self.finishSpeaking()
         }
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
         Task { @MainActor in
-            isSpeaking = false
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            self.finishSpeaking()
         }
     }
 }

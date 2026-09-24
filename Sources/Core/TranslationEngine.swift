@@ -151,7 +151,9 @@ final class TranslationEngine: ObservableObject {
                 }
             }
 
-            buffer += sanitizer.consume(await bridge.drain())
+            // 先把 await 的结果落到常量上：在 mutating 方法的参数位置写 await 会撞上独占访问检查。
+            let tail = await bridge.drain()
+            buffer += sanitizer.consume(tail)
             buffer += sanitizer.finish()
             output += buffer
             output = sanitizer.finalText

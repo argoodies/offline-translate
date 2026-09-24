@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct HistoryView: View {
     @EnvironmentObject private var history: HistoryStore

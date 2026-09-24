@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct PocketLingoApp: App {
@@ -37,8 +38,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         completionHandler: @escaping () -> Void
     ) {
         Task { @MainActor in
-            pendingCompletion = completionHandler
-            forwardPendingCompletion()
+            self.pendingCompletion = completionHandler
+            self.forwardPendingCompletion()
         }
     }
 

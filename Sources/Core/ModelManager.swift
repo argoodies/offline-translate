@@ -245,7 +245,7 @@ extension ModelManager: URLSessionDownloadDelegate {
         totalBytesExpectedToWrite: Int64
     ) {
         Task { @MainActor in
-            updateProgress(written: totalBytesWritten, total: totalBytesExpectedToWrite)
+            self.updateProgress(written: totalBytesWritten, total: totalBytesExpectedToWrite)
         }
     }
 
@@ -257,7 +257,7 @@ extension ModelManager: URLSessionDownloadDelegate {
         // HuggingFace 在文件不存在时返回 404 的 HTML 页面，不拦住的话会被当成模型存起来。
         if let response = downloadTask.response as? HTTPURLResponse, !(200...299).contains(response.statusCode) {
             Task { @MainActor in
-                finishFailed(String(localized: "下载失败（HTTP \(response.statusCode)）。"))
+                self.finishFailed(String(localized: "下载失败（HTTP \(response.statusCode)）。"))
             }
             return
         }
@@ -266,14 +266,14 @@ extension ModelManager: URLSessionDownloadDelegate {
 
     nonisolated func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         Task { @MainActor in
-            handleTaskCompletion(error: error)
+            self.handleTaskCompletion(error: error)
         }
     }
 
     nonisolated func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
         Task { @MainActor in
-            backgroundCompletionHandler?()
-            backgroundCompletionHandler = nil
+            self.backgroundCompletionHandler?()
+            self.backgroundCompletionHandler = nil
         }
     }
 }

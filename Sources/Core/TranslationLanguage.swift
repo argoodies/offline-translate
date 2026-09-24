@@ -53,10 +53,11 @@ extension TranslationLanguage {
         all.first { $0.code == code }
     }
 
-    /// 首次启动时的默认语言对：设备语言 ↔ 英语（设备本就是英语时配简体中文）。
-    static func defaultPair() -> (source: TranslationLanguage?, target: TranslationLanguage) {
+    /// 首次启动时的默认目标语言：设备语言以外的那一边。
+    /// 源语言不给默认值 —— 自动检测在实际使用里几乎总是对的。
+    static func defaultTarget() -> TranslationLanguage {
         let preferred = Locale.preferredLanguages.first.flatMap(matchDeviceLanguage) ?? .english
-        return (nil, preferred.code == "en" ? .simplifiedChinese : .english)
+        return preferred.code == "en" ? .simplifiedChinese : .english
     }
 
     private static func matchDeviceLanguage(_ identifier: String) -> TranslationLanguage? {
