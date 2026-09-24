@@ -1,0 +1,16 @@
+# XcodeGen 的产物，由 project.yml 生成
+*.xcodeproj
+*.xcworkspace
+
+# llama.cpp 的源码与编译产物
+.build/
+Vendor/
+
+# Xcode
+DerivedData/
+*.xcuserstate
+xcuserdata/
+build/
+
+# macOS
+.DS_Store

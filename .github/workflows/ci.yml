@@ -1,0 +1,53 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # 必须和 scripts/build-llama-xcframework.sh 里的默认值保持一致，否则缓存会认错版本。
+  LLAMA_REF: b11158
+
+jobs:
+  build:
+    name: 编译（模拟器）
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select newest Xcode
+        run: |
+          set -eo pipefail
+          LATEST=$(ls -d /Applications/Xcode_*.app | sed 's#.*/Xcode_##;s#.app##' | sort -V | tail -1)
+          sudo xcode-select -s "/Applications/Xcode_${LATEST}.app/Contents/Developer"
+          xcodebuild -version
+
+      # 从源码编 llama.cpp 要十来分钟，只有升级 LLAMA_REF 时才需要重来一次。
+      - name: Cache llama.xcframework
+        id: llama-cache
+        uses: actions/cache@v4
+        with:
+          path: Vendor/llama.xcframework
+          key: llama-xcframework-${{ env.LLAMA_REF }}-${{ runner.os }}
+
+      - name: Build llama.xcframework
+        if: steps.llama-cache.outputs.cache-hit != 'true'
+        run: ./scripts/build-llama-xcframework.sh
+
+      - name: Generate Xcode project
+        run: |
+          set -eo pipefail
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build
+        run: |
+          set -eo pipefail
+          xcodebuild build \
+            -project PocketLingo.xcodeproj \
+            -scheme PocketLingo \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO

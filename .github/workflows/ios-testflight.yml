@@ -1,0 +1,126 @@
+name: iOS → TestFlight
+
+# XcodeGen 生成工程 → xcodebuild 自动签名归档 → altool 上传 App Store Connect。手动触发。
+# 需要仓库 secrets：ASC_KEY_ID / ASC_ISSUER_ID / ASC_API_KEY_P8。
+# 必须用 macos-15（Xcode 26 / iOS 26 SDK），旧 SDK 会被 App Store Connect 直接退回。
+on:
+  workflow_dispatch:
+
+env:
+  LLAMA_REF: b11158
+  TEAM_ID: "9TGD35M5GT"
+  SCHEME: PocketLingo
+
+jobs:
+  testflight:
+    name: 归档并上传
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select newest Xcode
+        run: |
+          set -eo pipefail
+          LATEST=$(ls -d /Applications/Xcode_*.app | sed 's#.*/Xcode_##;s#.app##' | sort -V | tail -1)
+          sudo xcode-select -s "/Applications/Xcode_${LATEST}.app/Contents/Developer"
+          xcodebuild -version
+
+      - name: Write App Store Connect API key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+        run: |
+          set -eo pipefail
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          echo "$ASC_API_KEY_P8" > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          echo "ASC_KEY_PATH=$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" >> "$GITHUB_ENV"
+
+      - name: Cache llama.xcframework
+        id: llama-cache
+        uses: actions/cache@v4
+        with:
+          path: Vendor/llama.xcframework
+          key: llama-xcframework-${{ env.LLAMA_REF }}-${{ runner.os }}
+
+      - name: Build llama.xcframework
+        if: steps.llama-cache.outputs.cache-hit != 'true'
+        run: ./scripts/build-llama-xcframework.sh
+
+      - name: Generate Xcode project
+        run: |
+          set -eo pipefail
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Archive
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -eo pipefail
+          # build 号跟随 run_number 单调递增，避免和 TestFlight 上已有的构建撞号。
+          BUILD_NUM=${{ github.run_number }}
+          echo "BUILD_NUM=$BUILD_NUM" >> "$GITHUB_ENV"
+
+          xcodebuild archive \
+            -project PocketLingo.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/PocketLingo.xcarchive" \
+            CURRENT_PROJECT_VERSION=$BUILD_NUM \
+            CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM="$TEAM_ID" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Export .ipa
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -eo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>destination</key><string>export</string>
+          </dict></plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/PocketLingo.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Upload to App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -eo pipefail
+          IPA=$(find "$RUNNER_TEMP/export" -name "*.ipa" | head -1)
+          echo "ipa=$IPA"
+          # altool 遇到 409 之类的错误仍然 exit 0，只把 ERROR 打到 stdout，必须解析日志才知道成败。
+          xcrun altool --upload-app -f "$IPA" -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" 2>&1 | tee "$RUNNER_TEMP/altool.log"
+          if grep -qiE 'ERROR:|Validation failed' "$RUNNER_TEMP/altool.log"; then
+            echo "::error::上传 App Store Connect 失败（详见上方 Validation 日志）"
+            exit 1
+          fi
+
+      - name: Upload .ipa artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pocketlingo-ipa
+          path: ${{ runner.temp }}/export/**/*.ipa
+          if-no-files-found: warn

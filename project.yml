@@ -1,0 +1,55 @@
+# XcodeGen 工程描述。
+#
+# 用它而不是把 .xcodeproj 提交进仓库：pbxproj 是一坨带 UUID 的生成物，合并冲突极其难处理，
+# 而且 llama.xcframework 是 CI 现场编出来的，路径要在生成时才确定。
+#
+#   brew install xcodegen && xcodegen generate
+name: PocketLingo
+
+options:
+  bundleIdPrefix: io.argoodies
+  deploymentTarget:
+    # llama.cpp 的 xcframework 自己就是按 16.4 编的，不能再往下调。
+    iOS: "16.4"
+  developmentLanguage: zh-Hans
+  createIntermediateGroups: true
+  groupSortPosition: none
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: "9TGD35M5GT"
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_STRICT_CONCURRENCY: minimal
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+
+targets:
+  PocketLingo:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: Resources
+        excludes:
+          # Info.plist 走 INFOPLIST_FILE，不能同时作为资源被拷进 bundle。
+          - Info.plist
+    dependencies:
+      # CI 在这一步之前跑 scripts/build-llama-xcframework.sh 生成它。
+      - framework: Vendor/llama.xcframework
+        embed: true
+        codeSign: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.argoodies.pocketlingo
+        PRODUCT_NAME: PocketLingo
+        INFOPLIST_FILE: Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        SWIFT_EMIT_LOC_STRINGS: YES
+        ENABLE_PREVIEWS: YES
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE: NO
