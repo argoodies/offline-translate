@@ -9,7 +9,7 @@ import Combine
 enum ModelStorage {
     static let installedVariantKey = "installedModelVariantID"
     static let pendingVariantKey = "pendingModelVariantID"
-    static let sessionIdentifier = "io.argoodies.pocketlingo.modeldownload"
+    static let sessionIdentifier = "io.argoodies.aero.modeldownload"
 
     static var directory: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

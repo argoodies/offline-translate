@@ -55,8 +55,8 @@ jobs:
         run: |
           set -eo pipefail
           xcodebuild build \
-            -project PocketLingo.xcodeproj \
-            -scheme PocketLingo \
+            -project Aero.xcodeproj \
+            -scheme Aero \
             -configuration Debug \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO

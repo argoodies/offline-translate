@@ -3,19 +3,26 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var modelManager: ModelManager
-    @EnvironmentObject private var engine: TranslationEngine
+    @EnvironmentObject private var engine: ChatEngine
+    @Environment(\.dismiss) private var dismiss
 
     @State private var showDeleteConfirmation = false
 
     var body: some View {
         NavigationStack {
             Form {
-                translationSection
+                behaviourSection
                 modelSection
                 performanceSection
                 aboutSection
             }
             .navigationTitle(String(localized: "设置"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(String(localized: "完成")) { dismiss() }
+                }
+            }
             .confirmationDialog(
                 String(localized: "删除已下载的模型？"),
                 isPresented: $showDeleteConfirmation,
@@ -29,25 +36,31 @@ struct SettingsView: View {
                     }
                 }
             } message: {
-                Text(String(localized: "删除后需要重新下载才能继续翻译。"))
+                Text(String(localized: "删除后需要重新下载才能继续对话。"))
             }
         }
     }
 
-    private var translationSection: some View {
+    private var behaviourSection: some View {
         Section {
-            Picker(String(localized: "语气"), selection: $settings.tone) {
-                ForEach(TranslationTone.allCases) { tone in
-                    Text(tone.label).tag(tone)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(String(localized: "系统提示词"))
+                    .font(.subheadline)
+                TextEditor(text: $settings.systemPrompt)
+                    .frame(minHeight: 90)
+                    .font(.footnote)
+                Button(String(localized: "恢复默认")) {
+                    settings.resetSystemPrompt()
                 }
+                .font(.caption)
             }
+            .padding(.vertical, 4)
 
-            Toggle(String(localized: "输入后自动翻译"), isOn: $settings.autoTranslate)
-            Toggle(String(localized: "保存历史记录"), isOn: $settings.saveHistory)
+            Toggle(String(localized: "显示思考过程"), isOn: $settings.showReasoning)
         } header: {
-            Text(String(localized: "翻译"))
+            Text(String(localized: "对话"))
         } footer: {
-            Text(String(localized: "历史记录只保存在本设备，不会同步，也不参与 iCloud 备份。"))
+            Text(String(localized: "开启「显示思考过程」后，模型会先推理再作答 —— 更慢，但复杂问题上通常更准。关闭时它会跳过推理直接回答。改动在下一条消息生效。"))
         }
     }
 
@@ -78,27 +91,27 @@ struct SettingsView: View {
                 }
             }
 
+            Picker(String(localized: "单条回复上限"), selection: $settings.maxReplyTokens) {
+                ForEach(AppSettings.replyLengthOptions, id: \.self) { size in
+                    Text("\(size)").tag(size)
+                }
+            }
+
             Stepper(
                 String(localized: "线程数：\(settings.threadCount)"),
                 value: $settings.threadCount,
                 in: 1...AppSettings.maxThreadCount
             )
 
-            Toggle(String(localized: "结果可复现"), isOn: $settings.deterministicOutput)
-
-            if !settings.deterministicOutput {
-                VStack(alignment: .leading) {
-                    Text(String(format: NSLocalizedString("随机度：%.2f", comment: ""), settings.temperature))
-                        .font(.subheadline)
-                    Slider(value: $settings.temperature, in: 0.05...1.0, step: 0.05)
-                }
+            VStack(alignment: .leading) {
+                Text(String(format: NSLocalizedString("随机度：%.2f", comment: ""), settings.temperature))
+                    .font(.subheadline)
+                Slider(value: $settings.temperature, in: 0.05...1.2, step: 0.05)
             }
-
-            Toggle(String(localized: "跳过模型思考过程"), isOn: $settings.suppressThinking)
         } header: {
             Text(String(localized: "性能"))
         } footer: {
-            Text(String(localized: "上下文越长越能翻整段文字，但会占用更多内存。关闭「跳过思考过程」会让模型先推理再作答，更慢，个别难句可能更准。改动会重新加载模型。"))
+            Text(String(localized: "上下文越长越能记住前面的对话，但会占用更多内存，在旧机型上可能导致 app 被系统结束。随机度越低回答越稳定、越高越发散。改动会重新加载模型。"))
         }
     }
 
@@ -114,7 +127,7 @@ struct SettingsView: View {
         } header: {
             Text(String(localized: "关于"))
         } footer: {
-            Text(String(localized: "所有翻译都在本机完成。这个 app 除了下载模型之外不会发送任何网络请求。"))
+            Text(String(localized: "所有对话都在本机完成。这个 app 除了下载模型之外不会发送任何网络请求。"))
         }
     }
 

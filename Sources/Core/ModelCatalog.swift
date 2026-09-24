@@ -53,7 +53,7 @@ enum ModelCatalog {
             fileName: "Qwen3.5-0.8B-Q5_K_M.gguf",
             byteCount: 590_057_728,
             repository: repository,
-            summary: String(localized: "更高精度。长句和专有名词的处理更稳。")
+            summary: String(localized: "更高精度。长回答和专业内容上更稳。")
         ),
         ModelVariant(
             id: "Q8_0",

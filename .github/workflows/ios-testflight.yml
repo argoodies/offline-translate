@@ -9,7 +9,7 @@ on:
 env:
   LLAMA_REF: b11158
   TEAM_ID: "9TGD35M5GT"
-  SCHEME: PocketLingo
+  SCHEME: Aero
 
 jobs:
   testflight:
@@ -72,11 +72,11 @@ jobs:
           echo "BUILD_NUM=$BUILD_NUM" >> "$GITHUB_ENV"
 
           xcodebuild archive \
-            -project PocketLingo.xcodeproj \
+            -project Aero.xcodeproj \
             -scheme "$SCHEME" \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -archivePath "$RUNNER_TEMP/PocketLingo.xcarchive" \
+            -archivePath "$RUNNER_TEMP/Aero.xcarchive" \
             CURRENT_PROJECT_VERSION=$BUILD_NUM \
             CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM="$TEAM_ID" \
             -allowProvisioningUpdates \
@@ -102,7 +102,7 @@ jobs:
           PLIST
 
           xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/PocketLingo.xcarchive" \
+            -archivePath "$RUNNER_TEMP/Aero.xcarchive" \
             -exportPath "$RUNNER_TEMP/export" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
             -allowProvisioningUpdates \
@@ -130,6 +130,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pocketlingo-ipa
+          name: aero-ipa
           path: ${{ runner.temp }}/export/**/*.ipa
           if-no-files-found: warn

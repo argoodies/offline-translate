@@ -4,6 +4,8 @@ import SwiftUI
 ///
 /// 模型不随 app 打包：半 GB 会让安装包大到触发 App Store 的蜂窝下载限制，而且用户换档位时
 /// 还得整包更新。代价是首次使用需要联网一次 —— 装完之后就是真正的全程离线了。
+///
+/// 这是全 app 唯一会联网的地方。
 struct ModelSetupView: View {
     @EnvironmentObject private var modelManager: ModelManager
 
@@ -44,7 +46,7 @@ struct ModelSetupView: View {
 
     private var header: some View {
         VStack(spacing: 12) {
-            Image(systemName: "arrow.down.circle.dotted")
+            Image(systemName: "airplane.circle")
                 .font(.system(size: 56, weight: .light))
                 .foregroundStyle(.tint)
                 .padding(.top, 16)
@@ -53,7 +55,7 @@ struct ModelSetupView: View {
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
 
-            Text(String(localized: "翻译全部在这台设备上完成，文字不会离开你的手机。你需要先下载一次 Qwen3.5-0.8B 模型权重。"))
+            Text(String(localized: "对话全部在这台设备上完成，内容不会离开你的手机。你需要先下载一次 Qwen3.5-0.8B 模型权重。"))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

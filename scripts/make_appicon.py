@@ -1,20 +1,32 @@
 #!/usr/bin/env python3
-"""生成 App 图标（1024×1024）。
+"""生成 App 图标（1024×1024）—— 飞行模式。
 
-图形语言沿用翻译类 app 的惯例：左侧拉丁字母、右侧汉字，一眼能认出用途。
+沿用 iOS 控制中心里飞行模式那颗按钮的视觉：系统橙渐变打底，正中一架朝上的白色飞机。
 iOS 自己会切圆角，所以这里画满整个方形、不留透明边 —— 带 alpha 的图标会被 App Store 拒。
 """
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 SIZE = 1024
 OUTPUT = "Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png"
 
-# 靛蓝 → 青，深色背景让白色字形在浅色和深色壁纸上都立得住。
-TOP = (46, 58, 138)
-BOTTOM = (14, 132, 150)
+# 系统橙的上下两端，深色在下，让图标在浅色壁纸上也压得住。
+TOP = (255, 176, 64)
+BOTTOM = (243, 112, 0)
 
-CJK_BOLD = "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
-LATIN_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+# 朝上的飞机轮廓，右半边。坐标归一化到 -1…1，x 向右、y 向上，机头在 (0, 1)。
+# 左半边由镜像生成，保证绝对对称。
+HALF_OUTLINE = [
+    (0.00, 1.00),    # 机头
+    (0.075, 0.70),
+    (0.095, 0.28),   # 翼根前缘
+    (0.92, -0.12),   # 右翼尖前缘
+    (0.92, -0.34),   # 右翼尖后缘
+    (0.095, -0.28),  # 翼根后缘
+    (0.075, -0.60),
+    (0.30, -0.80),   # 右平尾尖
+    (0.30, -0.95),
+    (0.00, -0.87),   # 尾端中点。留一点 V 形缺口，但别深到看着像两条腿。
+]
 
 
 def vertical_gradient(size, top, bottom):
@@ -29,38 +41,31 @@ def vertical_gradient(size, top, bottom):
     return image
 
 
-def draw_centered(draw, text, font, center, fill):
-    left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
-    draw.text(
-        (center[0] - (right - left) / 2 - left, center[1] - (bottom - top) / 2 - top),
-        text,
-        font=font,
-        fill=fill,
-    )
+def airplane_polygon(center, scale):
+    """把归一化轮廓镜像成完整机身，再映射到像素坐标。"""
+    right = HALF_OUTLINE
+    # 跳过首尾两个点（机头和尾端中点都在中轴上，镜像会重复）。
+    left = [(-x, y) for x, y in reversed(right[1:-1])]
+    cx, cy = center
+    # 图像坐标 y 向下，所以取负。
+    return [(cx + x * scale, cy - y * scale) for x, y in right + left]
 
 
 def main():
-    image = vertical_gradient(SIZE, TOP, BOTTOM)
-    draw = ImageDraw.Draw(image, "RGBA")
+    # 先在 4 倍尺寸上画再缩回去 —— 便宜的抗锯齿，边缘不会有台阶。
+    supersample = 4
+    canvas = SIZE * supersample
 
-    latin = ImageFont.truetype(LATIN_BOLD, 340)
-    # index=0 选中 ttc 里的简体中文字形。
-    cjk = ImageFont.truetype(CJK_BOLD, 320, index=0)
+    image = vertical_gradient(canvas, TOP, BOTTOM)
+    draw = ImageDraw.Draw(image)
 
-    # iOS 会按 ~22% 半径切圆角，字形必须离边至少 10% 才不会被啃掉。
-    draw_centered(draw, "A", latin, (SIZE * 0.33, SIZE * 0.40), (255, 255, 255, 255))
-    draw_centered(draw, "文", cjk, (SIZE * 0.68, SIZE * 0.59), (255, 255, 255, 190))
-
-    # 一道细下划线，把两个字形收在同一个"词条"里，顺带压住构图重心。
-    bar_width, bar_height = SIZE * 0.34, SIZE * 0.025
-    x0 = (SIZE - bar_width) / 2
-    y0 = SIZE * 0.79
-    draw.rounded_rectangle(
-        [x0, y0, x0 + bar_width, y0 + bar_height],
-        radius=bar_height / 2,
-        fill=(255, 255, 255, 140),
+    # 0.34 的缩放让机翼展到约 63% 宽度，四周留够 iOS 圆角要啃掉的余量。
+    draw.polygon(
+        airplane_polygon(center=(canvas / 2, canvas / 2), scale=canvas * 0.34),
+        fill=(255, 255, 255),
     )
 
+    image = image.resize((SIZE, SIZE), Image.LANCZOS)
     image.save(OUTPUT)
     print(f"wrote {OUTPUT} ({image.size[0]}×{image.size[1]})")
 

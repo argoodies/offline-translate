@@ -144,26 +144,44 @@ actor LlamaBridge {
 
     // MARK: - 生成
 
-    /// 清空 KV cache 并喂入 prompt，返回 prompt 的 token 数。
-    @discardableResult
-    func prepare(prompt: String, maxNewTokens: Int) throws -> Int {
-        guard let context else { throw LlamaError.notLoaded }
+    /// 当前 KV cache 里已经占了多少 token。
+    var usedContext: Int { Int(cursor) }
 
+    var contextLimit: Int {
+        guard let context else { return 0 }
+        return Int(llama_n_ctx(context))
+    }
+
+    /// 丢掉整个 KV cache，回到空白对话。
+    func reset() {
+        guard let context else { return }
         llama_memory_clear(llama_get_memory(context), true)
         cursor = 0
         generatedCount = 0
         pendingBytes.removeAll()
-        self.maxNewTokens = maxNewTokens
         if let sampler {
             llama_sampler_reset(sampler)
         }
+    }
+
+    /// 在已有 KV cache 之后追加一段 prompt 并解码，返回这段 prompt 的 token 数。
+    ///
+    /// 多轮对话的关键：只喂新增的部分。每轮都把完整历史重新 decode 一遍，第十轮的首字延迟
+    /// 会是第一轮的十倍 —— 而 KV cache 里本来就存着前面所有轮的状态。
+    @discardableResult
+    func extend(prompt: String, maxNewTokens: Int) throws -> Int {
+        guard let context else { throw LlamaError.notLoaded }
+
+        generatedCount = 0
+        pendingBytes.removeAll()
+        self.maxNewTokens = maxNewTokens
 
         // parseSpecial: prompt 里的 <|im_start|> 等控制符要被识别成单个 token，不能当字面量。
         // addSpecial: ChatML 模板自己带了全部边界符，再让 tokenizer 追加 BOS 会重复。
         let tokens = try tokenize(prompt, addSpecial: false, parseSpecial: true)
-        let contextLimit = Int(llama_n_ctx(context))
-        guard tokens.count + maxNewTokens <= contextLimit else {
-            throw LlamaError.promptTooLong(promptTokens: tokens.count, contextSize: contextLimit)
+        let limit = Int(llama_n_ctx(context))
+        guard Int(cursor) + tokens.count + maxNewTokens <= limit else {
+            throw LlamaError.promptTooLong(promptTokens: Int(cursor) + tokens.count, contextSize: limit)
         }
         try decode(tokens: tokens)
         return tokens.count
@@ -323,9 +341,9 @@ enum LlamaError: LocalizedError {
         case .decodeFailed(let code):
             return String(localized: "推理失败（错误码 \(code)）。")
         case .contextExhausted:
-            return String(localized: "上下文已用尽，请缩短输入文本。")
+            return String(localized: "上下文已用尽，请开一个新对话。")
         case .promptTooLong(let promptTokens, let contextSize):
-            return String(localized: "输入过长（\(promptTokens) token，上限 \(contextSize)），请分段翻译。")
+            return String(localized: "这段对话太长了（\(promptTokens) token，上限 \(contextSize)），请开一个新对话。")
         }
     }
 }

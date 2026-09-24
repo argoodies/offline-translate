@@ -2,13 +2,13 @@ import SwiftUI
 import UIKit
 
 @main
-struct PocketLingoApp: App {
+struct AeroApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     @StateObject private var settings = AppSettings()
     @StateObject private var modelManager = ModelManager()
-    @StateObject private var engine = TranslationEngine()
-    @StateObject private var history = HistoryStore()
+    @StateObject private var engine = ChatEngine()
+    @StateObject private var store = ChatStore()
 
     var body: some Scene {
         WindowGroup {
@@ -16,7 +16,7 @@ struct PocketLingoApp: App {
                 .environmentObject(settings)
                 .environmentObject(modelManager)
                 .environmentObject(engine)
-                .environmentObject(history)
+                .environmentObject(store)
                 .onAppear { appDelegate.modelManager = modelManager }
         }
     }

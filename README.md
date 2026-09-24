@@ -1,8 +1,8 @@
-# 没网翻译 / Offline Translate
+# Aero
 
-完全离线的 iOS 翻译 app。Qwen3.5-0.8B 直接跑在设备上，文字不经过任何服务器。
+完全离线的 iOS AI 助手。Qwen3.5-0.8B 直接跑在设备上，对话不经过任何服务器。
 
-除了首次下载模型权重那一次，app 不发出任何网络请求。
+除了首次下载模型权重那一次，app 不发出任何网络请求 —— 开着飞行模式也能用，名字就是这么来的。
 
 ## 它是怎么搭起来的
 
@@ -10,24 +10,24 @@
 | --- | --- | --- |
 | 界面 | SwiftUI，iOS 16.4+ | 下限由 llama.cpp 的 xcframework 决定 |
 | 推理 | llama.cpp（Metal 后端） | GGUF 生态成熟，0.8B 在 A 系芯片上够快 |
-| 模型 | [Qwen3.5-0.8B](https://huggingface.co/Qwen/Qwen3.5-0.8B) GGUF，默认 Q4_K_M（507 MB） | 支持 201 种语言，是这个体积档里翻译质量最好的一批 |
-| 语种识别 | 系统 `NaturalLanguage` | 离线、免费、不占模型上下文 |
-| 朗读 | 系统 `AVSpeechSynthesizer` | 用设备上已装的离线语音包 |
+| 模型 | [Qwen3.5-0.8B](https://huggingface.co/Qwen/Qwen3.5-0.8B) GGUF，默认 Q4_K_M（507 MB） | 这个体积档里综合能力最好的一批，支持 201 种语言 |
 | 工程文件 | XcodeGen（`project.yml`） | `.xcodeproj` 不进仓库，避免 pbxproj 的合并地狱 |
 
 ```
 Sources/
   Core/
-    LlamaBridge.swift        actor，封装 llama.cpp 的 C API；prepare + step 的流式解码
-    TranslationPrompt.swift  ChatML prompt 构造 + 流式输出清洗
-    TranslationEngine.swift  编排层：加载模型、跑生成、统计速度
-    ModelManager.swift       background URLSession 下载、校验、安装
-    ModelCatalog.swift       可选的量化档位
-    TranslationLanguage.swift  语言表 + 离线语种识别
-    HistoryStore.swift       本地 JSON 历史记录
-    AppSettings.swift        用户设置
-    SpeechReader.swift       朗读
-  Views/                     翻译 / 历史 / 设置 / 模型安装
+    LlamaBridge.swift     actor，封装 llama.cpp 的 C API；reset / extend / step 的流式解码
+    ChatPrompt.swift      ChatML 增量拼接 + 流式输出清洗
+    ChatEngine.swift      编排：加载模型、复用或重建 KV cache、跑生成
+    Conversation.swift    消息与会话模型，本地 JSON 存储
+    ModelManager.swift    background URLSession 下载、校验、安装
+    ModelCatalog.swift    可选的量化档位
+    AppSettings.swift     用户设置
+  Views/
+    ChatView.swift             消息列表 + 输入栏
+    ConversationListView.swift 会话切换、重命名、删除
+    ModelSetupView.swift       首次启动的模型安装页
+    SettingsView.swift         系统提示词、性能参数
 ```
 
 ## 本地构建
@@ -38,22 +38,24 @@ Sources/
 ./scripts/build-llama-xcframework.sh   # 从源码编 llama.xcframework，首次约 10 分钟
 brew install xcodegen
 xcodegen generate
-open PocketLingo.xcodeproj
+open Aero.xcodeproj
 ```
 
-然后选真机运行。**模拟器也能跑，但没有 Metal，推理会退回 CPU，慢十倍以上** —— 测试翻译质量请用真机。
+然后选真机运行。**模拟器也能跑，但没有 Metal，推理会退回 CPU，慢十倍以上** —— 想知道真实速度请用真机。
 
 ## 几个实现上的选择
 
-**模型不打包进 app。** 半 GB 的二进制会把安装包顶到 App Store 的蜂窝下载限制以上，而且用户想换量化档位就得整包更新。代价是首次启动需要联网下一次 —— 装完之后就是真正的全程离线。下载走 background URLSession，切到后台继续，支持暂停续传。
+**多轮对话复用 KV cache。** 每轮只把新增的那段 prompt 喂进去（`LlamaBridge.extend`），而不是重新 decode 整段历史 —— 后者会让第十轮的首字延迟变成第一轮的十倍，而前面所有轮的状态本来就还躺在 cache 里。代价是要小心维护「cache 现在对应哪个会话、到哪一轮」：换会话、重新生成、中途停止都会让 cache 失效，这时才退回完整重建。
 
-**默认走贪心解码**（设置里可关）。同一句话每次都给同样的译文；翻译任务里输出跳动只会让人觉得 app 不稳定。
+**上下文满了自动裁剪。** 装不下就丢掉最早的一轮问答重建，直到能放下，并在界面上说明「较早的对话已被裁剪」。悄悄丢历史比明说更糟 —— 用户会觉得模型突然失忆。
 
-**抑制模型的思考过程。** Qwen3.5 是 hybrid thinking 模型，prompt 里给 assistant 开头塞一个空的 `<think></think>` 块就会跳过推理直接作答。翻译不需要思考链，省下的全是首字延迟。设置里可以关掉。
+**模型不打包进 app。** 半 GB 的二进制会把安装包顶到 App Store 的蜂窝下载限制以上，而且用户想换量化档位就得整包更新。改成首次启动下载，走 background URLSession，可暂停续传，用 GGUF 魔数校验。
 
-**手写 ChatML 而不是调 `llama_chat_apply_template`。** 后者不是 Jinja 解析器，只认内置的一批模板名，新模型经常落不到正确分支。Qwen 全系列都是 ChatML，手写反而更可靠。
+**默认抑制模型的思考过程。** Qwen3.5 是 hybrid thinking 模型，prompt 里给 assistant 开头塞一个空的 `<think></think>` 块就会跳过推理直接作答。日常问答不需要思考链，省下的全是首字延迟。设置里可以打开，打开后思考内容会折叠显示在回复上方。
 
-**流式输出要自己拼 UTF-8。** token 切片会把一个汉字劈成两半，直接 `String(cString:)` 会得到乱码。`LlamaBridge` 内部按字节缓冲，只在能构成完整字符时才吐出去。
+**手写 ChatML** 而不是 `llama_chat_apply_template` —— 后者不是 Jinja 解析器，只认内置的一批模板名，新模型经常落不到正确分支。Qwen 全系列都是 ChatML，手写反而更可靠。
+
+**流式输出要自己拼 UTF-8。** token 切片会把一个汉字劈成两半，直接转 String 就是乱码。`LlamaBridge` 内部按字节缓冲，只在能构成完整字符时才吐出去。
 
 ## 升级 llama.cpp
 
@@ -68,9 +70,7 @@ open PocketLingo.xcodeproj
 - `.github/workflows/ci.yml` —— push / PR 时编译验证（模拟器，不签名）。
 - `.github/workflows/ios-testflight.yml` —— 手动触发，归档并上传 TestFlight。
 
-上传需要仓库 secrets：`ASC_KEY_ID`、`ASC_ISSUER_ID`、`ASC_API_KEY_P8`。
-
-App Store Connect 侧复用已有的**没网翻译**记录（app `6815647930`，SKU `translator.offline.io.github.argoodies`）。它的 bundle id `dev.expo.client.cdk6asipshwbwfmintawzxd2uwcbu5iejxt3t4gqkoq4o` 是当初用 Expo 建记录时自动生成的占位串 —— 难看，但已经在 Developer Portal 注册好（identifier `WCU9XWSGJG`），而且用户看不到它。要换成正常的 id 只能去网页端改，API 不支持改 `bundleId`。
+上传需要仓库 secrets：`ASC_KEY_ID`、`ASC_ISSUER_ID`、`ASC_API_KEY_P8`。App Store Connect 侧复用已有的记录（app `6815647930`）；它的 bundle id 是当初用 Expo 建记录时自动生成的占位串，难看但已经在 Developer Portal 注册好，而且用户看不到它。
 
 两个 workflow 都把 `llama.xcframework` 按 `LLAMA_REF` 缓存，只有升级版本时才会重编。
 
