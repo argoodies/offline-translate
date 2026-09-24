@@ -26,21 +26,21 @@ file_size() {
 if [[ -f "$DEST" ]]; then
     actual=$(file_size "$DEST")
     if [[ "$actual" == "$EXPECTED_BYTES" ]]; then
-        echo "==> 模型已就位：$DEST"
+        echo "==> 模型已就位：${DEST}"
         exit 0
     fi
-    echo "==> 已有文件大小不符（$actual ≠ $EXPECTED_BYTES），重新下载"
+    echo "==> 已有文件大小不符（${actual} ≠ ${EXPECTED_BYTES}），重新下载"
     rm -f "$DEST"
 fi
 
 mkdir -p "$DEST_DIR"
-echo "==> 下载 $MODEL_FILE（约 507 MB）"
+echo "==> 下载 ${MODEL_FILE}（约 507 MB）"
 # -C - 断点续传，--retry 扛一下 HuggingFace 偶发的连接中断。
 curl -fL --retry 3 --retry-delay 2 -C - -o "$DEST" "$URL"
 
 actual=$(file_size "$DEST")
 if [[ "$actual" != "$EXPECTED_BYTES" ]]; then
-    echo "::error::下载的文件大小不对：$actual ≠ $EXPECTED_BYTES" >&2
+    echo "::error::下载的文件大小不对：${actual} ≠ ${EXPECTED_BYTES}" >&2
     rm -f "$DEST"
     exit 1
 fi
@@ -53,4 +53,4 @@ if [[ "$magic" != "GGUF" ]]; then
     exit 1
 fi
 
-echo "==> 完成：$DEST"
+echo "==> 完成：${DEST}"
