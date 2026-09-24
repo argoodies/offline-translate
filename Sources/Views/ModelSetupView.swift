@@ -132,7 +132,7 @@ struct ModelSetupView: View {
 
     /// 除了模型本身，还要留出余量给系统和 app 自身运行，所以多要 200MB。
     private var hasEnoughSpace: Bool {
-        guard let available = ModelManager.availableCapacity else { return true }
+        guard let available = ModelStorage.availableCapacity else { return true }
         return available > selectedVariant.byteCount + 200_000_000
     }
 

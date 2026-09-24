@@ -53,7 +53,8 @@ final class TranslationEngine: ObservableObject {
         var config = LlamaBridge.Config()
         config.contextSize = UInt32(settings.contextSize)
         config.threadCount = Int32(settings.threadCount)
-        config.temperature = settings.deterministicOutput ? 0 : settings.temperature
+        // 设置里用 Double（Slider 的原生类型），llama 的采样器要 Float。
+        config.temperature = settings.deterministicOutput ? 0 : Float(settings.temperature)
 
         do {
             try await bridge.load(modelPath: url.path, config: config)

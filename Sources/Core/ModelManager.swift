@@ -1,6 +1,33 @@
 import Foundation
 import Combine
 
+/// 模型文件在磁盘上的位置，以及相关的 UserDefaults 键。
+///
+/// 单独拆出来而不是挂在 `ModelManager` 上：后者是 `@MainActor` 类，它的 static 成员也会
+/// 跟着继承隔离，而 background URLSession 的 delegate 回调跑在后台队列上，必须能同步拿到
+/// 目标路径 —— 文件搬移要在回调返回前做完，否则系统会删掉临时文件。
+enum ModelStorage {
+    static let installedVariantKey = "installedModelVariantID"
+    static let pendingVariantKey = "pendingModelVariantID"
+    static let sessionIdentifier = "io.argoodies.pocketlingo.modeldownload"
+
+    static var directory: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return base.appendingPathComponent("Models", isDirectory: true)
+    }
+
+    static func fileURL(for variant: ModelVariant) -> URL {
+        directory.appendingPathComponent(variant.fileName)
+    }
+
+    /// 剩余可用磁盘空间，用来在下载前提示空间不足。
+    static var availableCapacity: Int64? {
+        let values = try? directory.deletingLastPathComponent()
+            .resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+        return values?.volumeAvailableCapacityForImportantUsage
+    }
+}
+
 /// 负责模型权重的下载、校验、存放和删除。
 ///
 /// 用 background URLSession：半 GB 的下载在蜂窝网络上要好几分钟，用户切到别的 app 是常态，
@@ -26,21 +53,17 @@ final class ModelManager: NSObject, ObservableObject {
     private var activeTask: URLSessionDownloadTask?
     private var resumeData: Data?
 
-    private static let installedVariantKey = "installedModelVariantID"
-    private static let pendingVariantKey = "pendingModelVariantID"
-    private static let sessionIdentifier = "io.argoodies.pocketlingo.modeldownload"
-
     /// 正在下载的档位。存在 UserDefaults 而不是内存里：background session 会在 app 被系统
     /// 杀掉后重新拉起进程并回调 delegate，那时任何实例变量都已经没了。
     /// UserDefaults 本身线程安全，所以 delegate 的后台队列也能直接读。
     private nonisolated var pendingVariant: ModelVariant? {
-        get { UserDefaults.standard.string(forKey: Self.pendingVariantKey).flatMap(ModelCatalog.variant(withID:)) }
-        set { UserDefaults.standard.set(newValue?.id, forKey: Self.pendingVariantKey) }
+        get { UserDefaults.standard.string(forKey: ModelStorage.pendingVariantKey).flatMap(ModelCatalog.variant(withID:)) }
+        set { UserDefaults.standard.set(newValue?.id, forKey: ModelStorage.pendingVariantKey) }
     }
 
     override init() {
         super.init()
-        let configuration = URLSessionConfiguration.background(withIdentifier: Self.sessionIdentifier)
+        let configuration = URLSessionConfiguration.background(withIdentifier: ModelStorage.sessionIdentifier)
         // 模型是 app 能用的前提，不该被系统的"合适时机"策略推迟。
         configuration.isDiscretionary = false
         configuration.sessionSendsLaunchEvents = true
@@ -48,30 +71,19 @@ final class ModelManager: NSObject, ObservableObject {
         refreshInstalledState()
     }
 
-    // MARK: - 存储位置
-
-    static var modelsDirectory: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return base.appendingPathComponent("Models", isDirectory: true)
-    }
-
-    static func fileURL(for variant: ModelVariant) -> URL {
-        modelsDirectory.appendingPathComponent(variant.fileName)
-    }
-
     var installedModelURL: URL? {
-        installedVariant.map(Self.fileURL(for:))
+        installedVariant.map(ModelStorage.fileURL(for:))
     }
 
     // MARK: - 状态
 
     /// 启动时扫描磁盘，判断已经装了哪个档位。
     func refreshInstalledState() {
-        let recorded = UserDefaults.standard.string(forKey: Self.installedVariantKey)
+        let recorded = UserDefaults.standard.string(forKey: ModelStorage.installedVariantKey)
         let candidates = [recorded.flatMap(ModelCatalog.variant(withID:))].compactMap { $0 } + ModelCatalog.all
         for variant in candidates where isFileComplete(variant) {
             installedVariant = variant
-            UserDefaults.standard.set(variant.id, forKey: Self.installedVariantKey)
+            UserDefaults.standard.set(variant.id, forKey: ModelStorage.installedVariantKey)
             state = .ready
             return
         }
@@ -81,7 +93,7 @@ final class ModelManager: NSObject, ObservableObject {
     }
 
     private func isFileComplete(_ variant: ModelVariant) -> Bool {
-        let url = Self.fileURL(for: variant)
+        let url = ModelStorage.fileURL(for: variant)
         guard let size = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64 else {
             return false
         }
@@ -101,7 +113,7 @@ final class ModelManager: NSObject, ObservableObject {
     func download(_ variant: ModelVariant) {
         guard activeTask == nil else { return }
         do {
-            try FileManager.default.createDirectory(at: Self.modelsDirectory, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: ModelStorage.directory, withIntermediateDirectories: true)
         } catch {
             state = .failed(error.localizedDescription)
             return
@@ -148,27 +160,20 @@ final class ModelManager: NSObject, ObservableObject {
 
     func deleteInstalledModel() {
         guard let variant = installedVariant else { return }
-        try? FileManager.default.removeItem(at: Self.fileURL(for: variant))
-        UserDefaults.standard.removeObject(forKey: Self.installedVariantKey)
+        try? FileManager.default.removeItem(at: ModelStorage.fileURL(for: variant))
+        UserDefaults.standard.removeObject(forKey: ModelStorage.installedVariantKey)
         installedVariant = nil
         state = .missing
-    }
-
-    /// 剩余可用磁盘空间，用来在下载前提示空间不足。
-    static var availableCapacity: Int64? {
-        let values = try? modelsDirectory.deletingLastPathComponent()
-            .resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-        return values?.volumeAvailableCapacityForImportantUsage
     }
 
     // MARK: - 下载完成的收尾
 
     /// 从后台线程调用：把临时文件搬到最终位置并校验。
     fileprivate nonisolated func install(temporaryURL: URL, variant: ModelVariant) {
-        let destination = Self.fileURL(for: variant)
+        let destination = ModelStorage.fileURL(for: variant)
         let fileManager = FileManager.default
         do {
-            try fileManager.createDirectory(at: Self.modelsDirectory, withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: ModelStorage.directory, withIntermediateDirectories: true)
             if fileManager.fileExists(atPath: destination.path) {
                 try fileManager.removeItem(at: destination)
             }
@@ -197,11 +202,11 @@ final class ModelManager: NSObject, ObservableObject {
         activeTask = nil
         resumeData = nil
         guard isFileComplete(variant) else {
-            try? FileManager.default.removeItem(at: Self.fileURL(for: variant))
+            try? FileManager.default.removeItem(at: ModelStorage.fileURL(for: variant))
             state = .failed(String(localized: "下载的文件校验未通过，请重试。"))
             return
         }
-        UserDefaults.standard.set(variant.id, forKey: Self.installedVariantKey)
+        UserDefaults.standard.set(variant.id, forKey: ModelStorage.installedVariantKey)
         installedVariant = variant
         pendingVariant = nil
         state = .ready

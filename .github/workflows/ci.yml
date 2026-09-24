@@ -25,9 +25,11 @@ jobs:
           xcodebuild -version
 
       # 从源码编 llama.cpp 要十来分钟，只有升级 LLAMA_REF 时才需要重来一次。
-      - name: Cache llama.xcframework
+      # 用 restore + save 而不是 actions/cache：后者只在 job 成功时才写缓存，
+      # 于是一个 Swift 编译错误就会让前面十几分钟的 llama.cpp 构建白做，每次重试都重来。
+      - name: Restore llama.xcframework
         id: llama-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: Vendor/llama.xcframework
           key: llama-xcframework-${{ env.LLAMA_REF }}-${{ runner.os }}
@@ -35,6 +37,13 @@ jobs:
       - name: Build llama.xcframework
         if: steps.llama-cache.outputs.cache-hit != 'true'
         run: ./scripts/build-llama-xcframework.sh
+
+      - name: Save llama.xcframework
+        if: steps.llama-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: Vendor/llama.xcframework
+          key: llama-xcframework-${{ env.LLAMA_REF }}-${{ runner.os }}
 
       - name: Generate Xcode project
         run: |
