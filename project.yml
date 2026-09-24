@@ -34,6 +34,9 @@ targets:
     sources:
       - path: Sources
       - path: Resources
+        # 显式指定，免得 .gguf 这种没人认识的扩展名被归错 build phase。
+        # Model/ 下的权重由 scripts/fetch-model.sh 提前拉好，会跟着一起打包。
+        buildPhase: resources
         excludes:
           # Info.plist 走 INFOPLIST_FILE，不能同时作为资源被拷进 bundle。
           - Info.plist

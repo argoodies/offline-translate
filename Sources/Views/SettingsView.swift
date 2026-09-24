@@ -2,11 +2,8 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var settings: AppSettings
-    @EnvironmentObject private var modelManager: ModelManager
     @EnvironmentObject private var engine: ChatEngine
     @Environment(\.dismiss) private var dismiss
-
-    @State private var showDeleteConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -22,21 +19,6 @@ struct SettingsView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(String(localized: "完成")) { dismiss() }
                 }
-            }
-            .confirmationDialog(
-                String(localized: "删除已下载的模型？"),
-                isPresented: $showDeleteConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button(String(localized: "删除"), role: .destructive) {
-                    Task {
-                        // 必须先卸载再删文件：llama 还 mmap 着它。
-                        await engine.unloadModel()
-                        modelManager.deleteInstalledModel()
-                    }
-                }
-            } message: {
-                Text(String(localized: "删除后需要重新下载才能继续对话。"))
             }
         }
     }
@@ -66,20 +48,19 @@ struct SettingsView: View {
 
     private var modelSection: some View {
         Section {
-            if let variant = modelManager.installedVariant {
-                LabeledContent(String(localized: "模型"), value: "Qwen3.5-0.8B")
-                LabeledContent(String(localized: "精度"), value: variant.quantization)
-                LabeledContent(String(localized: "占用空间"), value: variant.formattedSize)
+            LabeledContent(String(localized: "模型"), value: BundledModel.displayName)
+            LabeledContent(String(localized: "精度"), value: BundledModel.quantization)
+            if let size = BundledModel.formattedSize {
+                LabeledContent(String(localized: "占用空间"), value: size)
             }
             if let description = engine.modelDescription {
                 LabeledContent(String(localized: "架构"), value: description)
                     .font(.footnote)
             }
-            Button(String(localized: "删除模型"), role: .destructive) {
-                showDeleteConfirmation = true
-            }
         } header: {
             Text(String(localized: "模型"))
+        } footer: {
+            Text(String(localized: "模型随 app 一起安装，无需下载。"))
         }
     }
 
@@ -127,7 +108,7 @@ struct SettingsView: View {
         } header: {
             Text(String(localized: "关于"))
         } footer: {
-            Text(String(localized: "所有对话都在本机完成。这个 app 除了下载模型之外不会发送任何网络请求。"))
+            Text(String(localized: "所有对话都在本机完成。这个 app 不会发起任何网络请求。"))
         }
     }
 

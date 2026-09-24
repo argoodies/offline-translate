@@ -18,7 +18,8 @@ final class ChatEngine: ObservableObject {
         var generatedTokens: Int
     }
 
-    @Published private(set) var phase: Phase = .needsModel
+    // 模型随包安装，启动后必然会立刻加载，初始状态直接给加载中，避免闪一下空界面。
+    @Published private(set) var phase: Phase = .loadingModel
     /// 正在生成的回复。生成期间界面从这里读，结束后才落进 ChatStore ——
     /// 每个 token 都改动会话数组会让整个消息列表重绘。
     @Published private(set) var streamingText = ""

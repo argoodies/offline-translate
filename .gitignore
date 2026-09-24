@@ -6,6 +6,9 @@
 .build/
 Vendor/
 
+# 模型权重，507 MB，由 scripts/fetch-model.sh 拉取
+Resources/Model/
+
 # Xcode
 DerivedData/
 *.xcuserstate

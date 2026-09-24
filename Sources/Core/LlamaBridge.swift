@@ -333,7 +333,7 @@ enum LlamaError: LocalizedError {
         case .notLoaded:
             return String(localized: "模型尚未加载。")
         case .modelLoadFailed(let name):
-            return String(localized: "无法加载模型 \(name)，文件可能已损坏，请重新下载。")
+            return String(localized: "无法加载模型 \(name)，安装包可能已损坏，请重新安装。")
         case .contextCreationFailed:
             return String(localized: "创建推理上下文失败，可用内存可能不足。")
         case .tokenizationFailed:

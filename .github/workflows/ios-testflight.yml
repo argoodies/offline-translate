@@ -8,6 +8,7 @@ on:
 
 env:
   LLAMA_REF: b11158
+  MODEL_KEY: Qwen3.5-0.8B-Q4_K_M
   TEAM_ID: "9TGD35M5GT"
   SCHEME: Aero
 
@@ -54,6 +55,26 @@ jobs:
         with:
           path: Vendor/llama.xcframework
           key: llama-xcframework-${{ env.LLAMA_REF }}-${{ runner.os }}
+
+      # 模型权重不在仓库里（507 MB，超过 GitHub 单文件上限），构建前现拉一份。
+      # 同样用 restore + save：job 失败时 actions/cache 不写缓存，下次又得重下半个 G。
+      - name: Restore model weights
+        id: model-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: Resources/Model
+          key: model-${{ env.MODEL_KEY }}
+
+      - name: Fetch model weights
+        if: steps.model-cache.outputs.cache-hit != 'true'
+        run: ./scripts/fetch-model.sh
+
+      - name: Save model weights
+        if: steps.model-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: Resources/Model
+          key: model-${{ env.MODEL_KEY }}
 
       - name: Generate Xcode project
         run: |
@@ -125,11 +146,3 @@ jobs:
             echo "::error::上传 App Store Connect 失败（详见上方 Validation 日志）"
             exit 1
           fi
-
-      - name: Upload .ipa artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: aero-ipa
-          path: ${{ runner.temp }}/export/**/*.ipa
-          if-no-files-found: warn

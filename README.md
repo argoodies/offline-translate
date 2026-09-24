@@ -2,7 +2,7 @@
 
 完全离线的 iOS AI 助手。Qwen3.5-0.8B 直接跑在设备上，对话不经过任何服务器。
 
-除了首次下载模型权重那一次，app 不发出任何网络请求 —— 开着飞行模式也能用，名字就是这么来的。
+模型随 app 一起安装，装完就能用。app 不发出任何网络请求 —— 开着飞行模式也能用，名字就是这么来的。
 
 ## 它是怎么搭起来的
 
@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | 界面 | SwiftUI，iOS 16.4+ | 下限由 llama.cpp 的 xcframework 决定 |
 | 推理 | llama.cpp（Metal 后端） | GGUF 生态成熟，0.8B 在 A 系芯片上够快 |
-| 模型 | [Qwen3.5-0.8B](https://huggingface.co/Qwen/Qwen3.5-0.8B) GGUF，默认 Q4_K_M（507 MB） | 这个体积档里综合能力最好的一批，支持 201 种语言 |
+| 模型 | [Qwen3.5-0.8B](https://huggingface.co/Qwen/Qwen3.5-0.8B) GGUF，Q4_K_M（507 MB），随包安装 | 这个体积档里综合能力最好的一批，支持 201 种语言 |
 | 工程文件 | XcodeGen（`project.yml`） | `.xcodeproj` 不进仓库，避免 pbxproj 的合并地狱 |
 
 ```
@@ -20,13 +20,11 @@ Sources/
     ChatPrompt.swift      ChatML 增量拼接 + 流式输出清洗
     ChatEngine.swift      编排：加载模型、复用或重建 KV cache、跑生成
     Conversation.swift    消息与会话模型，本地 JSON 存储
-    ModelManager.swift    background URLSession 下载、校验、安装
-    ModelCatalog.swift    可选的量化档位
+    BundledModel.swift    定位 bundle 里的权重文件
     AppSettings.swift     用户设置
   Views/
     ChatView.swift             消息列表 + 输入栏
     ConversationListView.swift 会话切换、重命名、删除
-    ModelSetupView.swift       首次启动的模型安装页
     SettingsView.swift         系统提示词、性能参数
 ```
 
@@ -36,6 +34,7 @@ Sources/
 
 ```bash
 ./scripts/build-llama-xcframework.sh   # 从源码编 llama.xcframework，首次约 10 分钟
+./scripts/fetch-model.sh               # 拉 507 MB 权重到 Resources/Model/
 brew install xcodegen
 xcodegen generate
 open Aero.xcodeproj
@@ -49,7 +48,9 @@ open Aero.xcodeproj
 
 **上下文满了自动裁剪。** 装不下就丢掉最早的一轮问答重建，直到能放下，并在界面上说明「较早的对话已被裁剪」。悄悄丢历史比明说更糟 —— 用户会觉得模型突然失忆。
 
-**模型不打包进 app。** 半 GB 的二进制会把安装包顶到 App Store 的蜂窝下载限制以上，而且用户想换量化档位就得整包更新。改成首次启动下载，走 background URLSession，可暂停续传，用 GGUF 魔数校验。
+**模型打包进 app。** 装完就能用 —— 没有等待、没有下载失败、没有「装了 app 却用不了」的中间状态，也不需要任何网络权限。代价是安装包 500 MB 出头，蜂窝网络下 App Store 会多问用户一次。
+
+权重本身不进 git（GitHub 单文件上限 100 MB，LFS 的免费配额也撑不住），由 `scripts/fetch-model.sh` 在构建前拉取，CI 里按文件名缓存。
 
 **默认抑制模型的思考过程。** Qwen3.5 是 hybrid thinking 模型，prompt 里给 assistant 开头塞一个空的 `<think></think>` 块就会跳过推理直接作答。日常问答不需要思考链，省下的全是首字延迟。设置里可以打开，打开后思考内容会折叠显示在回复上方。
 
@@ -72,7 +73,7 @@ open Aero.xcodeproj
 
 上传需要仓库 secrets：`ASC_KEY_ID`、`ASC_ISSUER_ID`、`ASC_API_KEY_P8`。App Store Connect 侧复用已有的记录（app `6815647930`）；它的 bundle id 是当初用 Expo 建记录时自动生成的占位串，难看但已经在 Developer Portal 注册好，而且用户看不到它。
 
-两个 workflow 都把 `llama.xcframework` 按 `LLAMA_REF` 缓存，只有升级版本时才会重编。
+两个 workflow 都缓存 `llama.xcframework`（按 `LLAMA_REF`）和模型权重（按 `MODEL_KEY`），平时不会重编也不会重下。
 
 ## 许可
 
