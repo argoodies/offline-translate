@@ -15,6 +15,8 @@ actor LlamaBridge {
         /// 留几层在 CPU 上，那几层的权重才是真的按需读，启动能省一些。
         /// 代价是每生成一个 token，那几层都要走一遍 CPU。
         var gpuLayers: Int32 = 99
+        /// 权重怎么读进来。见 `AppSettings.loadMode`。
+        var loadMode: llama_load_mode = LLAMA_LOAD_MODE_MMAP
         var contextSize: UInt32 = 2048
         /// 单次 llama_decode 提交的最大 token 数，prompt 会按它分块喂入。
         var batchSize: UInt32 = 512
@@ -88,9 +90,17 @@ actor LlamaBridge {
         var modelParams = llama_model_default_params()
         // iOS 上 Metal 后端可用；模拟器没有 Metal，会自动回落 CPU。
         modelParams.n_gpu_layers = config.gpuLayers
-        // mmap 让 500MB 权重按页加载，常驻内存远低于文件大小 —— iOS 的内存上限很紧。
-        // 不要用 MLOCK：把整个模型钉在 RAM 里，iOS 会直接因内存超限杀掉 app。
-        modelParams.load_mode = LLAMA_LOAD_MODE_MMAP
+        // 这里原本写着「mmap 让权重按页加载，常驻内存远低于文件大小」。那句话对这个
+        // 模型不成立：lazy_mode 默认是 AUTO，而 AUTO 只对单个超过 4 GiB 的张量生效，
+        // 0.8B 里没有那种张量 —— 也就是 llama.h 里写的「always read the whole tensor
+        // up front」。权重照样会全部落地，mmap 只是把「读」换成了三万多次缺页中断，
+        // 省不下内存，还比顺序读慢。
+        //
+        // 何况开了 Metal 之后权重本来就要全部常驻（GPU buffer 直接包住这块内存），
+        // mmap 想省的那部分根本没机会省。
+        //
+        // 仍然不要用 MLOCK：那是把内存钉死不许回收，iOS 会直接因超限杀掉 app。
+        modelParams.load_mode = config.loadMode
 
         // 把半个 GB 的权重映射进来要几秒，没有进度的话界面看着像卡死。
         // C 回调不能捕获 Swift 闭包，所以把接收方包进一个 class，用 user_data 把指针带过去。

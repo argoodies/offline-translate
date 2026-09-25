@@ -16,6 +16,16 @@ enum AppSettings {
     /// 这个数字没有实测依据 —— 定它的机器上跑不了 iOS。真机上对比一下再定：
     /// 启动省下的是一次性的，出字慢下来是每个 token 都要还的。
     static let gpuLayers: Int32 = 20
+    /// 权重怎么读进来。
+    ///
+    /// 一度是 MMAP，以为能按页取用。但 `lazy_mode` 默认的 AUTO 只对超过 4 GiB 的
+    /// 单个张量生效，0.8B 里没有 —— 头文件的原话是「always read the whole tensor
+    /// up front」。于是整个文件照样要全部落地，mmap 只是把一次顺序读换成了三万多次
+    /// 缺页中断，省不下内存，还慢。开了 Metal 之后更是如此：GPU buffer 直接包住这块
+    /// 内存，权重必须全部常驻。
+    ///
+    /// DIRECT_IO 走顺序大块读。同样待实测 —— 换回 MMAP 改这一个值就行。
+    static let loadMode = LLAMA_LOAD_MODE_DIRECT_IO
     /// 上下文越大越能记住长对话，但 KV cache 会线性吃内存。
     static let contextSize = 4096
     static let maxReplyTokens = 512
