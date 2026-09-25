@@ -36,6 +36,12 @@ struct NoteView: View {
             draft = ""
             writing = false
         }
+        // 收笔即落字：键盘一收，刚写的那段就定下来。
+        // 切换记事和新建都是先清空 draft 再 blur，所以不会在那两处误提交。
+        .onChange(of: writing) { isWriting in
+            guard !isWriting else { return }
+            commit()
+        }
     }
 
     // MARK: - 文档
@@ -62,6 +68,7 @@ struct NoteView: View {
                 .padding(.bottom, 32)
             }
             .background(Palette.canvas)
+            .scrollDismissesKeyboard(.interactively)
             // 点空白处就开始写 —— 跟备忘录一样，不用去够某个输入框。
             .contentShape(Rectangle())
             .onTapGesture { writing = true }
@@ -152,12 +159,12 @@ struct NoteView: View {
                 .accessibilityLabel(L("New note"))
             }
         }
-        // 提交动作放在键盘上方 —— 文档里不该常驻一个发送按钮。
+        // 「完成」只负责收起键盘，落笔这件事由 blur 本身触发。
+        // 留着它是因为空文档时没内容可滑，下滑收键盘那条路走不通。
         ToolbarItemGroup(placement: .keyboard) {
             Spacer()
-            Button(L("Send")) { send() }
+            Button(L("Done")) { writing = false }
                 .font(.body.weight(.semibold))
-                .disabled(!canSend)
         }
     }
 
@@ -211,16 +218,11 @@ struct NoteView: View {
 
     // MARK: - 动作
 
-    private var canSend: Bool {
-        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && engine.phase == .ready
-    }
-
-    private func send() {
-        guard canSend else { return }
-        let text = draft
+    /// 把刚写的那段定下来，让模型从下一行接着写。
+    private func commit() {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, engine.phase == .ready else { return }
         draft = ""
-        // 写完就收笔：键盘退下去，刚写的那段落定，回答从下一行开始。
-        writing = false
         speech.stop()
         Haptics.messageSent()
         engine.send(text, store: store)
