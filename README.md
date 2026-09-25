@@ -1,4 +1,4 @@
-# QWHD
+# QW
 
 完全离线的 iPad AI 助手。Qwen3.5-0.8B 直接跑在设备上，对话不经过任何服务器。
 
@@ -45,7 +45,7 @@ Sources/
 ./scripts/fetch-model.sh               # 拉 507 MB 权重到 Resources/Model/
 brew install xcodegen
 xcodegen generate
-open QWHD.xcodeproj
+open QW.xcodeproj
 ```
 
 然后选真机运行。**模拟器也能跑，但没有 Metal，推理会退回 CPU，慢十倍以上** —— 想知道真实速度请用真机。

@@ -1,18 +1,10 @@
 #!/usr/bin/env python3
-"""生成 App 图标和 app 内用的 logo。
-
-标记是一个原创的 Q 字形：粗圆环加一道斜尾。
-
-刻意没有照搬 Qwen 的标志 —— 那是阿里巴巴的注册商标，拿别人的商标做自己 app 的图标
-会被 App Review 按 Guideline 5.2.5 拒，也有实打实的法律风险。Q 这个字母本身是通用字形，
-自己画没问题。
+"""生成 App 图标和 app 内用的 logo：白底黑字 QW。
 
 iOS 会给 App 图标切圆角，所以那张画满整个方形、不留透明边 —— 带 alpha 的图标会被
 App Store 拒。app 内那张反过来要透明底。
 """
-import math
-
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 ICON_SIZE = 1024
 LOGO_SIZE = 512
@@ -24,16 +16,12 @@ TOP = (255, 255, 255)
 BOTTOM = (244, 244, 246)
 INK = (0, 0, 0)
 
-# Q 的几何，全是画布比例。
-RING_CENTER = (0.5, 0.465)
-RING_RADIUS = 0.255      # 圆环中线的半径
-RING_WIDTH = 0.105       # 环的粗细
-# 尾巴的起止，单位是环中线半径 r 的倍数。环外缘在 (r + RING_WIDTH/2) / r ≈ 1.21 处，
-# 所以 OUTER 必须明显大于它，否则尾巴整根埋在环里，Q 就成了 O。
-TAIL_INNER = 0.72
-TAIL_OUTER = 1.46
-TAIL_ANGLE = 42          # 斜尾的方向，从正右往下量
-TAIL_WIDTH = 0.105
+TEXT = "QW"
+FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+# 字宽占画布的比例。字母标横向铺开才够醒目，0.72 之外仍留得下 iOS 圆角要啃掉的边。
+TEXT_WIDTH_RATIO = 0.72
+# 视觉居中：Q 的尾巴挂在基线以下，纯按外框居中会显得整体偏上。
+BASELINE_NUDGE = -0.015
 
 
 def vertical_gradient(size, top, bottom):
@@ -48,34 +36,39 @@ def vertical_gradient(size, top, bottom):
     return image
 
 
-def q_mask(size):
-    """把 Q 画成一张遮罩，之后拿它往底上贴颜色。
+def fitted_font(size):
+    """二分出能让字宽正好占到目标比例的字号。
 
-    画成遮罩而不是直接画色块，是为了让图标和 app 内 logo 共用同一套几何 ——
+    直接按经验值给字号，换个字体或改文案就得重调；按宽度反推省这一步。
+    """
+    target = size * TEXT_WIDTH_RATIO
+    probe = ImageDraw.Draw(Image.new("L", (1, 1)))
+    low, high = 1, size
+    while low < high:
+        mid = (low + high + 1) // 2
+        font = ImageFont.truetype(FONT_PATH, mid)
+        left, _, right, _ = probe.textbbox((0, 0), TEXT, font=font)
+        if right - left <= target:
+            low = mid
+        else:
+            high = mid - 1
+    return ImageFont.truetype(FONT_PATH, low)
+
+
+def text_mask(size):
+    """把 QW 画成一张遮罩，之后拿它往底上贴颜色。
+
+    画成遮罩而不是直接画字，是为了让图标和 app 内 logo 共用同一套几何 ——
     一个贴在渐变底上，一个贴在透明底上。
     """
     mask = Image.new("L", (size, size), 0)
     draw = ImageDraw.Draw(mask)
-
-    cx, cy = RING_CENTER[0] * size, RING_CENTER[1] * size
-    r = RING_RADIUS * size
-    half = RING_WIDTH * size / 2
-
-    # 圆环：外圆填实，再把内圆挖掉。
-    draw.ellipse([cx - r - half, cy - r - half, cx + r + half, cy + r + half], fill=255)
-    draw.ellipse([cx - r + half, cy - r + half, cx + r - half, cy + r - half], fill=0)
-
-    # 斜尾：沿角度堆一串圆点。不用 draw.line —— 它是平头的，端点要另外补圆，
-    # 堆圆点顺手就把两头做成圆的了。
-    angle = math.radians(TAIL_ANGLE)
-    tail_r = TAIL_WIDTH * size / 2
-    steps = 240
-    for i in range(steps + 1):
-        t = TAIL_INNER + (TAIL_OUTER - TAIL_INNER) * i / steps
-        x = cx + r * t * math.cos(angle)
-        y = cy + r * t * math.sin(angle)
-        draw.ellipse([x - tail_r, y - tail_r, x + tail_r, y + tail_r], fill=255)
-
+    font = fitted_font(size)
+    # 按字形的实际外框居中，不用 anchor —— 字体自带的行高会把重心带偏。
+    left, top, right, bottom = draw.textbbox((0, 0), TEXT, font=font)
+    x = (size - (right - left)) / 2 - left
+    y = (size - (bottom - top)) / 2 - top + BASELINE_NUDGE * size
+    draw.text((x, y), TEXT, font=font, fill=255)
     return mask
 
 
@@ -85,14 +78,14 @@ def main():
 
     canvas = ICON_SIZE * supersample
     icon = vertical_gradient(canvas, TOP, BOTTOM)
-    icon = Image.composite(Image.new("RGB", (canvas, canvas), INK), icon, q_mask(canvas))
+    icon = Image.composite(Image.new("RGB", (canvas, canvas), INK), icon, text_mask(canvas))
     icon.resize((ICON_SIZE, ICON_SIZE), Image.LANCZOS).save(ICON_OUTPUT)
     print(f"wrote {ICON_OUTPUT} ({ICON_SIZE}×{ICON_SIZE})")
 
     # app 内那张要透明底，才能贴在任何背景上。
     canvas = LOGO_SIZE * supersample
     logo = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
-    logo.paste(Image.new("RGBA", (canvas, canvas), INK + (255,)), mask=q_mask(canvas))
+    logo.paste(Image.new("RGBA", (canvas, canvas), INK + (255,)), mask=text_mask(canvas))
     logo.resize((LOGO_SIZE, LOGO_SIZE), Image.LANCZOS).save(LOGO_OUTPUT)
     print(f"wrote {LOGO_OUTPUT} ({LOGO_SIZE}×{LOGO_SIZE})")
 

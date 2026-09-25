@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct QWHDApp: App {
+struct QWApp: App {
     @StateObject private var engine = ChatEngine()
     @StateObject private var store = ChatStore()
     @StateObject private var speech = SpeechReader()
