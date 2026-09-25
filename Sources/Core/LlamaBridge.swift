@@ -1,4 +1,5 @@
 import Foundation
+import os
 import llama
 
 /// 对 llama.cpp C API 的最小封装。
@@ -158,10 +159,16 @@ actor LlamaBridge {
         }
 
         guard let createdContext else {
+            // 趁模型还没释放先记下现场 —— 一旦 free 掉，额度就回弹了，
+            // 那时候再读到的不是失败当时的数字。
+            let snapshot = Self.memorySnapshot()
             llama_model_free(loadedModel)
             model = nil
             vocab = nil
-            throw LlamaError.contextCreationFailed
+            throw LlamaError.contextCreationFailed(
+                availableMB: snapshot.availableMB,
+                thermal: snapshot.thermal
+            )
         }
         context = createdContext
         // 后面喂 prompt 要按实际拿到的批大小分块，裁剪历史也要按实际的上下文长度算。
@@ -390,7 +397,7 @@ actor LlamaBridge {
 enum LlamaError: LocalizedError {
     case notLoaded
     case modelLoadFailed(String)
-    case contextCreationFailed
+    case contextCreationFailed(availableMB: Int, thermal: String)
     case tokenizationFailed
     case decodeFailed(Int32)
     case contextExhausted
@@ -405,8 +412,12 @@ enum LlamaError: LocalizedError {
             return "The model is not loaded yet."
         case .modelLoadFailed(let name):
             return "Could not load \(name). The install may be damaged."
-        case .contextCreationFailed:
-            return "Failed to create the inference context; the device may be low on memory."
+        case .contextCreationFailed(let availableMB, let thermal):
+            // 「可能是内存不够」谁看了都没用 —— 既不能确认，也不知道该做什么。
+            // 把失败当时的两个数字写出来：还剩多少额度、机器有多烫。
+            return "Not enough memory to prepare the model. "
+                + "\(availableMB) MB of this app's budget was free and the device was \(thermal). "
+                + "Close some apps or let the phone cool down, then try again."
         case .tokenizationFailed:
             return "Tokenization failed."
         case .decodeFailed(let code):
@@ -416,6 +427,28 @@ enum LlamaError: LocalizedError {
         case .promptTooLong(let promptTokens, let contextSize):
             return "Prompt too long: \(promptTokens) tokens, limit \(contextSize)."
         }
+    }
+}
+
+extension LlamaBridge {
+    /// 失败当时的内存额度和温度。
+    ///
+    /// `os_proc_available_memory` 报的是这个进程还能再要多少。iOS 给每个 app 的额度
+    /// 远小于设备物理内存，而且随系统压力浮动 —— 同一台机器、同一个包，这一分钟能
+    /// 加载下一分钟不能，差的就是这个数。
+    ///
+    /// 热状态一并记：建上下文正好要编 Metal 内核、要 GPU 缓冲，机器烫的时候
+    /// 这类请求是最先被拒的一批。
+    nonisolated static func memorySnapshot() -> (availableMB: Int, thermal: String) {
+        let thermal: String
+        switch ProcessInfo.processInfo.thermalState {
+        case .nominal:  thermal = "cool"
+        case .fair:     thermal = "warm"
+        case .serious:  thermal = "hot"
+        case .critical: thermal = "overheating"
+        @unknown default: thermal = "in an unknown thermal state"
+        }
+        return (Int(os_proc_available_memory() / (1024 * 1024)), thermal)
     }
 }
 

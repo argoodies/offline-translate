@@ -56,6 +56,10 @@ struct RootView: View {
                     .animation(.easeOut(duration: 0.2), value: loadingCaption)
             }
         }
+        // 整屏可敲。等半分钟太无聊了，而一块戳下去有反应的屏幕，至少不像死的。
+        // 它什么也不改变 —— 加载不会因此变快，只是有点事做。
+        .contentShape(Rectangle())
+        .onTapGesture { Haptics.idleTap() }
         .ignoresSafeArea()
     }
 

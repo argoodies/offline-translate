@@ -20,6 +20,14 @@ enum Haptics {
         stream.prepare()
     }
 
+    /// 加载页上闲敲一下。
+    ///
+    /// 纯粹是给等待的人一点手感 —— 半分钟盯着一根进度条实在无聊，能戳出反应的
+    /// 屏幕至少不像死的。用 send 那个发生器，light 比 soft 清脆，敲着才有回应感。
+    static func idleTap() {
+        send.impactOccurred(intensity: 0.7)
+    }
+
     static func messageSent() {
         send.impactOccurred()
         // 紧接着就是生成，顺手把另一个也热上。
