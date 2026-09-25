@@ -1,10 +1,12 @@
 import SwiftUI
 import UIKit
+import MarkdownUI
 
 struct ChatView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var engine: ChatEngine
     @EnvironmentObject private var store: ChatStore
+    @EnvironmentObject private var speech: SpeechReader
 
     @State private var draft = ""
     @State private var showConversations = false
@@ -57,6 +59,14 @@ struct ChatView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
             }
+        }
+        .onChange(of: engine.lastFinishedMessage) { message in
+            guard settings.autoSpeak, let message else { return }
+            speech.speak(messageID: message.id, text: message.text)
+        }
+        .onChange(of: store.currentID) { _ in
+            // 换会话时上一条还在念就显得很怪。
+            speech.stop()
         }
     }
 
@@ -150,7 +160,7 @@ struct ChatView: View {
                 .rotationEffect(.degrees(-90))
             Text(String(localized: "全程离线"))
                 .font(.headline)
-            Text(String(localized: "模型跑在这台设备上，对话不会离开你的手机。开飞行模式也能用。"))
+            Text(String(localized: "模型跑在这台设备上，对话不会离开你的手机。"))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -216,10 +226,12 @@ struct ChatView: View {
     private func send() {
         let text = draft
         draft = ""
+        speech.stop()
         engine.send(text, store: store, settings: settings)
     }
 
     private func startNewConversation() {
+        speech.stop()
         store.startNewConversation()
         // 新会话的 KV cache 必须从头来，否则模型会带着上一段对话的记忆。
         engine.invalidateContext()
@@ -227,12 +239,15 @@ struct ChatView: View {
     }
 }
 
-/// 一条消息。用户消息靠右、着色；模型回复靠左、纯文本宽排。
+/// 一条消息。用户消息靠右、着色；模型回复靠左，按 Markdown 渲染。
 private struct MessageBubble: View {
     let message: ChatMessage
     var isStreaming = false
 
+    @EnvironmentObject private var speech: SpeechReader
     @State private var showReasoning = false
+
+    private var isSpeaking: Bool { speech.speakingID == message.id }
 
     var body: some View {
         HStack {
@@ -244,20 +259,14 @@ private struct MessageBubble: View {
                 }
 
                 if !message.text.isEmpty {
-                    Text(message.text)
-                        .textSelection(.enabled)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(background)
-                        .foregroundStyle(message.role == .user ? Color.white : Color.primary)
-                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                    content
                 } else if isStreaming {
                     // 首个 token 到达前给个动静，否则点完发送界面像卡住了。
                     ProgressView()
                         .controlSize(.small)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 12)
-                        .background(background)
+                        .background(bubbleBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 18))
                 }
 
@@ -265,6 +274,10 @@ private struct MessageBubble: View {
                     Label(String(localized: "回复因长度上限被截断"), systemImage: "scissors")
                         .font(.caption2)
                         .foregroundStyle(.orange)
+                }
+
+                if message.role == .assistant, !isStreaming, !message.text.isEmpty {
+                    actions
                 }
             }
             .frame(maxWidth: .infinity, alignment: message.role == .user ? .trailing : .leading)
@@ -285,8 +298,69 @@ private struct MessageBubble: View {
         }
     }
 
-    private var background: some ShapeStyle {
-        message.role == .user ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color(.secondarySystemBackground))
+    @ViewBuilder
+    private var content: some View {
+        if message.role == .user {
+            // 用户自己打的字原样显示，不做 Markdown 解析 —— 谁也不希望自己打的 * 号消失。
+            Text(message.text)
+                .textSelection(.enabled)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(bubbleBackground)
+                .foregroundStyle(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+        } else if isStreaming {
+            // 生成过程中用纯文本：半截的 Markdown（没闭合的代码块、写了一半的表格）
+            // 每 50 毫秒重新解析一次，界面会疯狂闪烁。生成完再渲染。
+            Text(message.text)
+                .textSelection(.enabled)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(bubbleBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+        } else {
+            Markdown(message.text)
+                .markdownTheme(.aero)
+                // 本地模型不会产出图片链接，而且这个 app 不联网 —— 换成只读 asset 的
+                // provider，彻底堵死 MarkdownUI 默认的远程图片加载。
+                .markdownImageProvider(.asset)
+                .markdownInlineImageProvider(.asset)
+                .textSelection(.enabled)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(bubbleBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+        }
+    }
+
+    private var actions: some View {
+        HStack(spacing: 16) {
+            Button {
+                speech.toggle(messageID: message.id, text: message.text)
+            } label: {
+                Image(systemName: isSpeaking ? "stop.circle" : "speaker.wave.2")
+            }
+            .accessibilityLabel(isSpeaking
+                                ? String(localized: "停止朗读")
+                                : String(localized: "朗读"))
+
+            Button {
+                UIPasteboard.general.string = message.text
+            } label: {
+                Image(systemName: "doc.on.doc")
+            }
+            .accessibilityLabel(String(localized: "复制"))
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .padding(.leading, 4)
+        .padding(.top, 2)
+    }
+
+    private var bubbleBackground: some ShapeStyle {
+        message.role == .user
+            ? AnyShapeStyle(Color.accentColor)
+            : AnyShapeStyle(Color(.secondarySystemBackground))
     }
 
     private func reasoningBlock(_ reasoning: String) -> some View {
@@ -316,4 +390,38 @@ private struct MessageBubble: View {
             }
         }
     }
+}
+
+private extension Theme {
+    /// MarkdownUI 的默认主题是给整页文档设计的，字号和段距放进气泡里太松散。
+    static let aero = Theme()
+        .text {
+            FontSize(UIFont.preferredFont(forTextStyle: .body).pointSize)
+        }
+        .code {
+            FontFamilyVariant(.monospaced)
+            FontSize(.em(0.88))
+        }
+        .paragraph { configuration in
+            configuration.label
+                .relativeLineSpacing(.em(0.18))
+                .markdownMargin(top: 0, bottom: 10)
+        }
+        .listItem { configuration in
+            configuration.label.markdownMargin(top: 4)
+        }
+        .codeBlock { configuration in
+            ScrollView(.horizontal) {
+                configuration.label
+                    .relativeLineSpacing(.em(0.2))
+                    .markdownTextStyle {
+                        FontFamilyVariant(.monospaced)
+                        FontSize(.em(0.85))
+                    }
+                    .padding(12)
+            }
+            .background(Color(.tertiarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .markdownMargin(top: 6, bottom: 10)
+        }
 }

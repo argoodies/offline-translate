@@ -13,9 +13,19 @@
 "发送" = "Send";
 "复制" = "Copy";
 "分享" = "Share";
+"朗读" = "Read aloud";
+"停止朗读" = "Stop reading";
 "重命名" = "Rename";
 "标题" = "Title";
 "此操作无法撤销。" = "This cannot be undone.";
+
+/* 飞行模式关卡 */
+"请打开飞行模式" = "Turn on Airplane Mode";
+"Aero 完全离线运行，不需要网络。\n从右上角下拉打开控制中心，点亮飞机图标。" = "Aero runs entirely offline and needs no network.\nSwipe down from the top-right for Control Center, then tap the airplane.";
+"已离线" = "Offline";
+"检测到网络连接" = "Network connection detected";
+"仍要继续" = "Continue anyway";
+"模型已就绪" = "Model ready";
 
 /* 启动 */
 "正在加载模型…" = "Loading model…";
@@ -31,7 +41,7 @@
 "删除全部对话？" = "Delete all chats?";
 "%lld 条消息" = "%lld messages";
 "全程离线" = "Entirely offline";
-"模型跑在这台设备上，对话不会离开你的手机。开飞行模式也能用。" = "The model runs on this device. Nothing you say leaves your phone — it works in airplane mode.";
+"模型跑在这台设备上，对话不会离开你的手机。" = "The model runs on this device. Nothing you say leaves your phone.";
 "思考过程" = "Reasoning";
 "回复因长度上限被截断" = "Reply cut off at the length limit";
 "上下文快满了，可以开一个新对话" = "Context is nearly full — consider starting a new chat";
@@ -41,7 +51,8 @@
 "系统提示词" = "System prompt";
 "恢复默认" = "Reset to default";
 "显示思考过程" = "Show reasoning";
-"开启「显示思考过程」后，模型会先推理再作答 —— 更慢，但复杂问题上通常更准。关闭时它会跳过推理直接回答。改动在下一条消息生效。" = "With reasoning shown, the model thinks before answering — slower, but usually better on hard questions. With it off, it answers directly. Takes effect on your next message.";
+"自动朗读回复" = "Read replies aloud";
+"开启「显示思考过程」后，模型会先推理再作答 —— 更慢，但复杂问题上通常更准。关闭时它会跳过推理直接回答。改动在下一条消息生效。\n\n朗读用系统语音，同样不联网；每条回复旁边也有单独的播放按钮。" = "With reasoning shown, the model thinks before answering — slower, but usually better on hard questions. With it off, it answers directly. Takes effect on your next message.\n\nSpeech uses the system voices and is also fully offline; every reply has its own play button too.";
 "模型" = "Model";
 "精度" = "Precision";
 "占用空间" = "Size on disk";

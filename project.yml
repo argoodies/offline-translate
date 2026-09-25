@@ -15,6 +15,11 @@ options:
   createIntermediateGroups: true
   groupSortPosition: none
 
+packages:
+  MarkdownUI:
+    url: https://github.com/gonzalezreal/swift-markdown-ui
+    from: "2.4.1"
+
 settings:
   base:
     # 语言模式，不是编译器版本 —— 只接受 4 / 4.2 / 5 / 6。
@@ -45,6 +50,8 @@ targets:
       - framework: Vendor/llama.xcframework
         embed: true
         codeSign: true
+      - package: MarkdownUI
+        product: MarkdownUI
     settings:
       base:
         # 复用 App Store Connect 上已有的那条记录（app 6815647930）。

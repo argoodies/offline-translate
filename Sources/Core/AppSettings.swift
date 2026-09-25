@@ -17,6 +17,8 @@ final class AppSettings: ObservableObject {
     @Published var systemPrompt: String { didSet { store(systemPrompt, "systemPrompt") } }
     /// 关闭时会在 prompt 里塞一个空的思考块，让模型跳过推理直接作答 —— 首字快得多。
     @Published var showReasoning: Bool { didSet { store(showReasoning, "showReasoning") } }
+    /// 回复生成完就自动念出来。
+    @Published var autoSpeak: Bool { didSet { store(autoSpeak, "autoSpeak") } }
 
     init() {
         let defaults = UserDefaults.standard
@@ -27,6 +29,7 @@ final class AppSettings: ObservableObject {
         topP = defaults.object(forKey: "topP") as? Double ?? 0.9
         systemPrompt = defaults.string(forKey: "systemPrompt") ?? ChatPrompt.defaultSystemPrompt
         showReasoning = defaults.object(forKey: "showReasoning") as? Bool ?? false
+        autoSpeak = defaults.object(forKey: "autoSpeak") as? Bool ?? true
     }
 
     /// 只包含需要重建 llama context 的参数 —— 变了才重新加载模型。

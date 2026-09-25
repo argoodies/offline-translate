@@ -11,6 +11,8 @@
 | 界面 | SwiftUI，iOS 16.4+ | 下限由 llama.cpp 的 xcframework 决定 |
 | 推理 | llama.cpp（Metal 后端） | GGUF 生态成熟，0.8B 在 A 系芯片上够快 |
 | 模型 | [Qwen3.5-0.8B](https://huggingface.co/Qwen/Qwen3.5-0.8B) GGUF，Q4_K_M（507 MB），随包安装 | 这个体积档里综合能力最好的一批，支持 201 种语言 |
+| Markdown | [swift-markdown-ui](https://github.com/gonzalezreal/swift-markdown-ui) 2.4 | 系统的 `AttributedString(markdown:)` 不支持代码块和表格 |
+| 朗读 | 系统 `AVSpeechSynthesizer` | 设备上已装的语音包同样离线 |
 | 工程文件 | XcodeGen（`project.yml`） | `.xcodeproj` 不进仓库，避免 pbxproj 的合并地狱 |
 
 ```
@@ -21,9 +23,12 @@ Sources/
     ChatEngine.swift      编排：加载模型、复用或重建 KV cache、跑生成
     Conversation.swift    消息与会话模型，本地 JSON 存储
     BundledModel.swift    定位 bundle 里的权重文件
+    NetworkGate.swift     NWPathMonitor，判断当前是否离线
+    SpeechReader.swift    朗读回复，按回复语言选系统语音
     AppSettings.swift     用户设置
   Views/
-    ChatView.swift             消息列表 + 输入栏
+    ChatView.swift             消息列表 + 输入栏，Markdown 渲染
+    AirplaneGateView.swift     联网时挡在对话前的那一页
     ConversationListView.swift 会话切换、重命名、删除
     SettingsView.swift         系统提示词、性能参数
 ```
@@ -47,6 +52,12 @@ open Aero.xcodeproj
 **多轮对话复用 KV cache。** 每轮只把新增的那段 prompt 喂进去（`LlamaBridge.extend`），而不是重新 decode 整段历史 —— 后者会让第十轮的首字延迟变成第一轮的十倍，而前面所有轮的状态本来就还躺在 cache 里。代价是要小心维护「cache 现在对应哪个会话、到哪一轮」：换会话、重新生成、中途停止都会让 cache 失效，这时才退回完整重建。
 
 **上下文满了自动裁剪。** 装不下就丢掉最早的一轮问答重建，直到能放下，并在界面上说明「较早的对话已被裁剪」。悄悄丢历史比明说更糟 —— 用户会觉得模型突然失忆。
+
+**联网时不让进对话。** Aero 的主张是不被打扰，所以入口直接把这件事变成一个动作：去打开飞行模式，检测到断网自动放行。
+
+需要说清楚的是，iOS **没有公开 API 能查「飞行模式是否开启」**，能查的只有网络可达性（`NWPathMonitor`）。开了飞行模式必然无网，但反过来不成立 —— 关掉 Wi-Fi 和蜂窝也算。对这个 app 来说效果等价，文案按飞行模式写。这一页还留了个「仍要继续」的出口：状态判断依赖系统回调，真出现误判时不该把人锁死在启动页。
+
+**流式时不渲染 Markdown。** 生成中途的 Markdown 是半截的 —— 没闭合的代码块、写了一半的表格 —— 每 50 毫秒重新解析一次会让界面疯狂闪烁。所以生成时走纯文本，收尾后再交给 MarkdownUI。图片 provider 换成了只读 asset 的版本，堵死它默认的远程图片加载：这个 app 不该有任何出网路径。
 
 **模型打包进 app。** 装完就能用 —— 没有等待、没有下载失败、没有「装了 app 却用不了」的中间状态，也不需要任何网络权限。代价是安装包 500 MB 出头，蜂窝网络下 App Store 会多问用户一次。
 

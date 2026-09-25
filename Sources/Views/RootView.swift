@@ -3,6 +3,7 @@ import SwiftUI
 struct RootView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var engine: ChatEngine
+    @EnvironmentObject private var gate: NetworkGate
 
     var body: some View {
         ZStack {
@@ -15,12 +16,19 @@ struct RootView: View {
                 missingModel
             }
 
-            if engine.phase == .loadingModel {
+            // 模型在后台照常加载 —— 用户开飞行模式的这几秒正好用来 mmap 权重，
+            // 等他从控制中心回来通常已经能直接说话了。
+            if gate.hasDetermined && !gate.allowsChat {
+                AirplaneGateView()
+                    .transition(.opacity)
+            } else if !gate.hasDetermined || engine.phase == .loadingModel {
                 launchScreen
                     .transition(.opacity)
             }
         }
         .animation(.easeOut(duration: 0.25), value: engine.phase)
+        .animation(.easeOut(duration: 0.25), value: gate.allowsChat)
+        .animation(.easeOut(duration: 0.25), value: gate.hasDetermined)
     }
 
     /// 首次启动要把半 GB 权重 mmap 起来，有一两秒空窗，不挡一下会看到一个空白的对话界面。
