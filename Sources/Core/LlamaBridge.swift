@@ -8,6 +8,13 @@ import llama
 /// 于是取消、UI 刷新、超时都由调用方自然控制。
 actor LlamaBridge {
     struct Config {
+        /// 交给 Metal 的层数。99 等于全部。
+        ///
+        /// 全量 offload 时 llama.cpp 要把整段 mmap 包成 GPU buffer，半个 GB 的页
+        /// 得在加载时全部落地 —— mmap 的「按页取用」这时候不成立，启动就慢在这儿。
+        /// 留几层在 CPU 上，那几层的权重才是真的按需读，启动能省一些。
+        /// 代价是每生成一个 token，那几层都要走一遍 CPU。
+        var gpuLayers: Int32 = 99
         var contextSize: UInt32 = 2048
         /// 单次 llama_decode 提交的最大 token 数，prompt 会按它分块喂入。
         var batchSize: UInt32 = 512
@@ -79,8 +86,8 @@ actor LlamaBridge {
         }
 
         var modelParams = llama_model_default_params()
-        // iOS 上 Metal 后端可用，0.8B 全量 offload 到 GPU；模拟器没有 Metal，会自动回落 CPU。
-        modelParams.n_gpu_layers = 99
+        // iOS 上 Metal 后端可用；模拟器没有 Metal，会自动回落 CPU。
+        modelParams.n_gpu_layers = config.gpuLayers
         // mmap 让 500MB 权重按页加载，常驻内存远低于文件大小 —— iOS 的内存上限很紧。
         // 不要用 MLOCK：把整个模型钉在 RAM 里，iOS 会直接因内存超限杀掉 app。
         modelParams.load_mode = LLAMA_LOAD_MODE_MMAP

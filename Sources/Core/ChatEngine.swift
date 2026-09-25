@@ -59,6 +59,7 @@ final class ChatEngine: ObservableObject {
         loadProgress = 0
 
         var config = LlamaBridge.Config()
+        config.gpuLayers = AppSettings.gpuLayers
         config.contextSize = UInt32(AppSettings.contextSize)
         config.threadCount = Int32(AppSettings.threadCount)
         config.temperature = Float(AppSettings.temperature)

@@ -8,6 +8,14 @@ enum AppSettings {
     /// 界面上唯一一个「词」，而它是产品名，不属于任何语言。
     /// 顶栏标题和还没写字的笔记都显示它。
     static let title = "QW"
+    /// 交给 Metal 的层数，用来在「启动快」和「出字快」之间取舍。
+    ///
+    /// 99（全部）启动最慢：全量 offload 会逼着 500 MB 权重在加载时全部落地。
+    /// 调小能省下启动时间，但落在 CPU 上的那几层，每个 token 都要重走一遍。
+    ///
+    /// 这个数字没有实测依据 —— 定它的机器上跑不了 iOS。真机上对比一下再定：
+    /// 启动省下的是一次性的，出字慢下来是每个 token 都要还的。
+    static let gpuLayers: Int32 = 20
     /// 上下文越大越能记住长对话，但 KV cache 会线性吃内存。
     static let contextSize = 4096
     static let maxReplyTokens = 512
