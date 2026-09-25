@@ -153,8 +153,10 @@ private struct LoadingBar: View {
 
                 Capsule()
                     .fill(Palette.ink)
-                    // 已填充的部分至少露一点，否则 0% 时什么都看不见。
-                    .frame(width: max(filled, 4))
+                    // 就是真实进度，0% 就是零宽。一度给过 4pt 的下限，好让扫光有地方
+                    // 可扫；后来扫光改成横穿整条，空轨道自己就有动静了，下限只剩下
+                    // 「一上来就已经加载了一截」这个假象。
+                    .frame(width: filled)
                     // 回调按 1% 一跳，直接改宽度是一格一格地蹦；
                     // 缓动之后是滑过去的，也顺带把跳变的间隙填上了。
                     .animation(.easeOut(duration: 0.45), value: progress)
