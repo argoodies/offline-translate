@@ -15,40 +15,25 @@ struct RootView: View {
         .animation(.easeOut(duration: 0.25), value: engine.phase)
     }
 
-    /// 模型没就绪就不构建对话界面 —— 不是拿遮罩盖住，是根本不存在。
-    /// 只有加载成功（或重试成功）才进得去。
+    /// 只有一种情况进不去：模型加载失败。那时整屏是错误页，不是拿遮罩盖住 ——
+    /// 对话界面根本不构建，只有重试成功才放行。
+    ///
+    /// 「加载中」曾经也拦在外面，后来放开了：见下面那段注释。
     @ViewBuilder
     private func content(modelURL: URL) -> some View {
         switch engine.phase {
-        case .loadingModel:
-            loadingScreen.transition(.opacity)
         case .loadFailed:
             failureScreen(modelURL: modelURL).transition(.opacity)
-        case .ready, .generating, .failed:
+        case .loadingModel, .ready, .generating, .failed:
+            // 加载中也直接进来。进来第一件事是写字，而写字本来就要好几秒 ——
+            // 让人盯着进度条等完再开始，是把两段本可以重叠的时间排成了串行。
+            // 加载进度改在顶栏画一条细线，写完了模型还没好就先收着，就绪即发。
+            //
+            // .loadFailed 仍然整屏拦住：那是模型压根没有，放进来只能得到一页
+            // 什么都不回应的空白。
             // .failed 是单轮生成出错，模型还在 —— 留在文档里，下一段接着写。
             NoteView().transition(.opacity)
         }
-    }
-
-    /// 首次启动要把半 GB 权重读进来，得有几秒。
-    /// 进度来自 llama.cpp 的加载回调，不是假动画 —— 会动的只是那道扫光。
-    private var loadingScreen: some View {
-        // ignoresSafeArea 要加在 ZStack 上而不是那层底色上。只染底色的话，
-        // ZStack 自己仍然被安全区框着，内容居中的是安全区 —— 刘海和 Home 指示条
-        // 的 inset 并不对称，看着就是偏的。
-        ZStack {
-            Palette.canvas
-            VStack(spacing: 22) {
-                Image("Logo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 112, height: 112)
-
-                LoadingBar(progress: engine.loadProgress)
-                    .frame(width: 180, height: 4)
-            }
-        }
-        .ignoresSafeArea()
     }
 
     /// 加载失败给条退路。否则只能杀掉 app 重开 —— 而重开多半也是同样的结果。
@@ -99,7 +84,7 @@ struct RootView: View {
 /// 比慢更像死机。扫光跟进度无关，只要还在加载就一直横穿，说明这事还在进行。
 ///
 /// 填充宽度仍然是真实进度，一格没有多给。
-private struct LoadingBar: View {
+struct LoadingBar: View {
     let progress: Double
 
     @State private var sweeping = false
