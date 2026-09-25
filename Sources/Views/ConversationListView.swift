@@ -2,7 +2,7 @@ import SwiftUI
 
 /// 所有笔记。
 ///
-/// 这一页上只有「New note」一处文字，其余是图形和数字。
+/// 这一页上只有「New text」一处文字，其余是图形和数字。
 /// 「删除全部」和「重命名」都拿掉了 —— 两者都要弹一个带「取消 / 确定」的对话框。
 /// 删除还在，逐条左滑；标题不用改，跟备忘录一样取正文第一行。
 struct ConversationListView: View {
@@ -47,7 +47,7 @@ struct ConversationListView: View {
         Button {
             select(store.startNewConversation())
         } label: {
-            Label("New note", systemImage: "square.and.pencil")
+            Label("New text", systemImage: "square.and.pencil")
                 .font(.body.weight(.medium))
                 .foregroundStyle(Palette.canvas)
                 .padding(.horizontal, 24)
