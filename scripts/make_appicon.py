@@ -20,19 +20,20 @@ BOTTOM = (244, 244, 246)
 
 PLANE = (0, 0, 0)
 
-# 朝上的飞机轮廓，右半边。坐标归一化到 -1…1，x 向右、y 向上，机头在 (0, 1)。
-# 左半边由镜像生成，保证绝对对称。
+# 飞机轮廓的一半。坐标归一化到 -1…1，先按机头朝上定义（x 向右、y 向上，机头在 (0, 1)），
+# 对称轴是纵轴，另一半镜像出来 —— 这样比直接写朝右的形状好读，也保证绝对对称。
+# 最后在 airplane_polygon 里整体转 90° 变成机头朝右。
 HALF_OUTLINE = [
-    (0.00, 1.00),    # 机头
-    (0.065, 0.66),
-    (0.085, 0.26),   # 翼根前缘
-    (0.90, -0.16),   # 右翼尖前缘：明显后掠，翼尖压到机身之下
-    (0.90, -0.33),   # 右翼尖后缘
-    (0.085, -0.30),  # 翼根后缘
-    (0.065, -0.62),
-    (0.29, -0.82),   # 右平尾尖
-    (0.29, -0.95),
-    (0.00, -0.86),   # 尾端中点。留一点 V 形缺口，但别深到看着像两条腿。
+    (0.00, 0.94),    # 机头。别太尖 —— 横过来之后细长的尖刺很扎眼
+    (0.085, 0.58),
+    (0.105, 0.26),   # 翼根前缘
+    (0.70, -0.20),   # 翼尖前缘：明显后掠，翼尖压到机身之后
+    (0.70, -0.33),   # 翼尖后缘
+    (0.105, -0.26),  # 翼根后缘
+    (0.085, -0.58),
+    (0.25, -0.78),   # 平尾尖
+    (0.25, -0.91),
+    (0.00, -0.84),   # 尾端中点。留一点 V 形缺口，但别深到看着像两条腿。
 ]
 
 
@@ -49,13 +50,18 @@ def vertical_gradient(size, top, bottom):
 
 
 def airplane_polygon(center, scale):
-    """把归一化轮廓镜像成完整机身，再映射到像素坐标。"""
+    """把归一化轮廓镜像成完整机身，转成机头朝右，再映射到像素坐标。"""
     right = HALF_OUTLINE
     # 跳过首尾两个点（机头和尾端中点都在中轴上，镜像会重复）。
     left = [(-x, y) for x, y in reversed(right[1:-1])]
     cx, cy = center
-    # 图像坐标 y 向下，所以取负。
-    return [(cx + x * scale, cy - y * scale) for x, y in right + left]
+    points = []
+    for x, y in right + left:
+        # 顺时针转 90°：机头从 (0, 1) 落到 (1, 0)。
+        rx, ry = y, -x
+        # 图像坐标 y 向下，所以取负。
+        points.append((cx + rx * scale, cy - ry * scale))
+    return points
 
 
 def rounded_mask(size, polygon, radius):
@@ -77,8 +83,8 @@ def main():
 
     image = vertical_gradient(canvas, TOP, BOTTOM)
 
-    # 0.36 的缩放让机翼展到约 65% 宽度，四周留够 iOS 圆角要啃掉的余量。
-    polygon = airplane_polygon(center=(canvas / 2, canvas / 2), scale=canvas * 0.36)
+    # 机身转横之后比朝上时扁，放大到 0.40 才不会在画面里显得小。
+    polygon = airplane_polygon(center=(canvas / 2, canvas / 2), scale=canvas * 0.40)
     mask = rounded_mask(canvas, polygon, radius=canvas * 0.012)
 
     plane = Image.new("RGB", (canvas, canvas), PLANE)

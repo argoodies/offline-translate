@@ -39,7 +39,6 @@ struct RootView: View {
                 Image(systemName: "airplane")
                     .font(.system(size: 48, weight: .light))
                     .foregroundStyle(Palette.ink)
-                    .rotationEffect(.degrees(-90))
                 Text(String(localized: "正在加载模型…"))
                     .font(.subheadline)
                     .foregroundStyle(Palette.inkSecondary)

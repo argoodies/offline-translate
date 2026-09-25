@@ -156,7 +156,6 @@ struct ChatView: View {
             Image(systemName: "airplane")
                 .font(.system(size: 40, weight: .light))
                 .foregroundStyle(Palette.ink)
-                .rotationEffect(.degrees(-90))
             Text(String(localized: "全程离线"))
                 .font(.headline)
             Text(String(localized: "模型跑在这台设备上，对话不会离开你的手机。"))

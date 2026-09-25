@@ -24,7 +24,6 @@ struct AirplaneGateView: View {
                 Image(systemName: "airplane")
                     .font(.system(size: 54, weight: .light))
                     .foregroundStyle(Palette.ink)
-                    .rotationEffect(.degrees(-90))
             }
             .animation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true), value: pulsing)
             .onAppear { pulsing = true }
