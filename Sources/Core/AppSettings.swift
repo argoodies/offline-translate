@@ -27,9 +27,17 @@ enum AppSettings {
     ///
     /// DIRECT_IO 走顺序大块读。同样待实测 —— 换回 MMAP 改这一个值就行。
     static let loadMode = LLAMA_LOAD_MODE_DIRECT_IO
-    /// 上下文越大越能记住长对话，但 KV cache 会线性吃内存。
-    static let contextSize = 4096
+    /// 上下文越大越能记住长对话，但 KV cache 会线性吃内存 —— 而这块内存是在
+    /// `llama_init_from_model` 里一次性分配好的，进度条走完之后那段等待就有它一份。
+    /// 4096 砍到 2048，分配量减半；代价是能记住的轮数也减半。
+    static let contextSize = 2048
     static let maxReplyTokens = 512
+    /// 单次 decode 提交的最大 token 数。计算图的缓冲按它分配，同样在建上下文那一步，
+    /// 所以调小既省内存又省启动时间。
+    ///
+    /// 512 砍到 256 对出字速度基本没影响 —— 它只决定一次喂多少 prompt，
+    /// 而这个 app 的输入是一段笔记，本来就远不到 256。
+    static let batchSize: UInt32 = 256
     /// 性能核数量；iPhone 上开满所有核反而会被调度器降频，留一个给系统。
     static let threadCount = Int(LlamaBridge.Config.defaultThreadCount)
     static let temperature = 0.7

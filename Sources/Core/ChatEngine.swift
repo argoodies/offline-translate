@@ -62,6 +62,7 @@ final class ChatEngine: ObservableObject {
         config.gpuLayers = AppSettings.gpuLayers
         config.loadMode = AppSettings.loadMode
         config.contextSize = UInt32(AppSettings.contextSize)
+        config.batchSize = AppSettings.batchSize
         config.threadCount = Int32(AppSettings.threadCount)
         config.temperature = Float(AppSettings.temperature)
         config.topP = Float(AppSettings.topP)
