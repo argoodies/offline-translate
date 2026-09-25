@@ -1,0 +1,20 @@
+# QW 的公开页面：首页、隐私政策、支持页。
+#
+# 跟 distribution/ 那个下载页相反 —— 这个就是要给人找到的。App Store 会把
+# 隐私政策和支持链接长期指向这里，所以 app 名写死在这儿，不能随便换。
+app = "qw-offline"
+primary_region = "lax"
+
+[build]
+
+[http_service]
+  internal_port = 80
+  force_https = true
+  # 几个静态页，没人访问时停机，Apple 或用户点进来再拉起。
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

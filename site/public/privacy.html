@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Privacy — QW</title>
+<meta name="description" content="QW collects nothing. It makes no network requests, has no analytics, no accounts and no third-party SDKs.">
+<link rel="stylesheet" href="/style.css">
+
+<nav>
+  <a class="mark" href="/" style="color:var(--ink);text-decoration:none">QW</a>
+  <a href="/privacy.html" aria-current="page">Privacy</a>
+  <a href="/support.html">Support</a>
+</nav>
+
+<main>
+  <h1>Privacy</h1>
+  <p class="lede">QW collects nothing. There is no server to collect it to.</p>
+
+  <h2>The short version</h2>
+  <p>QW makes no network requests. Not for the model, not for analytics, not for crash reports, not for checking whether an update exists. The app contains no networking code at all, which means this is not a promise about how data is handled — it is a statement that there is no path for data to leave.</p>
+  <p>You can verify it yourself: turn on Airplane Mode and use the app normally. Nothing degrades, because nothing was ever being fetched.</p>
+
+  <h2>What is collected</h2>
+  <div class="ledger">
+    <div><span>Personal information (name, email, phone)</span><span>None</span></div>
+    <div><span>Account or sign-in</span><span>None — there is no account</span></div>
+    <div><span>Your notes and the model's replies</span><span>Stay on the device</span></div>
+    <div><span>Usage analytics or telemetry</span><span>None</span></div>
+    <div><span>Crash reports</span><span>None</span></div>
+    <div><span>Advertising or tracking identifiers</span><span>None</span></div>
+    <div><span>Location</span><span>Never requested</span></div>
+    <div><span>Contacts, photos, microphone, camera</span><span>Never requested</span></div>
+    <div><span>Third-party SDKs</span><span>None</span></div>
+    <div><span>Cookies</span><span>None — the app has no web content</span></div>
+  </div>
+  <p>This corresponds to <strong>Data Not Collected</strong> on the App Store privacy label.</p>
+
+  <h2>Where your notes live</h2>
+  <p>Notes are written to a single file inside the app's own container on the device. iOS keeps that container private to QW; no other app can read it.</p>
+  <p>They are not synced to iCloud and are excluded from nothing in particular — they simply never leave the app's storage. Deleting QW deletes them along with it, and there is no copy anywhere else to recover them from.</p>
+
+  <h2>The model</h2>
+  <p>Qwen3.5&#8209;0.8B is bundled inside the app package. It is loaded from local storage and run locally on the device's GPU through Metal. Your prompts are turned into tokens in memory and never serialised anywhere except the notes file you can see.</p>
+  <p>The model's weights are fixed. Nothing you write trains it, adjusts it, or is retained by it between launches.</p>
+
+  <h2>Read aloud</h2>
+  <p>Long-pressing a reply can read it aloud using <code>AVSpeechSynthesizer</code>, the system speech engine. It uses voices already installed on your device and runs offline. QW does not send the text anywhere to have it spoken.</p>
+  <p>If you have not downloaded a voice for a given language, iOS may offer to fetch one. That download is between you and Apple; QW is not involved and does not require it.</p>
+
+  <h2>Sharing and copying</h2>
+  <p>If you tap Share or Copy on a reply, the text goes wherever you send it, and that destination's privacy terms take over from there. That is the only way content leaves the app, and it only happens when you ask for it.</p>
+
+  <h2>Children</h2>
+  <p>QW is not directed at children and collects no data from anyone, including children. Replies come from a language model and are not filtered or reviewed; treat them the way you would treat any generated text.</p>
+
+  <h2>Changes</h2>
+  <p>If a future version ever collects anything, this page will say so before that version ships, and the App Store privacy label will change to match. Given that the app has no networking code, such a change would be a rewrite rather than a tweak.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about this policy: open an issue at <a href="https://github.com/argoodies/qw/issues">github.com/argoodies/qw/issues</a>.</p>
+
+  <p class="stamp">Last updated 25 September 2026 · applies to QW 0.1.0 and later</p>
+</main>
+</html>
