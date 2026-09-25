@@ -50,7 +50,10 @@ final class NetworkGate: ObservableObject {
     /// 重连），这时 status 依然是 `.satisfied`。反过来，只剩 loopback 或某个说不清的虚拟
     /// 接口时 status 也可能是 satisfied，那既不构成打扰，也不该把人锁在门外。
     /// 所以按实际使用的接口类型来判。
-    private static func classify(_ path: NWPath) -> Link {
+    ///
+    /// 必须是 nonisolated：这个类型带 `@MainActor`，static 成员会跟着继承隔离，
+    /// 而 pathUpdateHandler 跑在后台队列上，同步调不到 main actor 上的东西。
+    private nonisolated static func classify(_ path: NWPath) -> Link {
         guard path.status == .satisfied else { return .none }
         if path.usesInterfaceType(.wifi) { return .wifi }
         if path.usesInterfaceType(.cellular) { return .cellular }
