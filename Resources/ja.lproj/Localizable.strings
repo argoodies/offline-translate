@@ -26,7 +26,7 @@
 
 /* 飞行模式关卡 */
 "Turn on Airplane Mode" = "機内モードをオンにしてください";
-"Aero runs entirely offline and needs no network.\nSwipe down from the top-right for Control Center, then tap the airplane." = "Aero は完全にオフラインで動作し、ネットワークを必要としません。\n画面右上から下にスワイプしてコントロールセンターを開き、飛行機のアイコンをタップしてください。";
+"Plai runs entirely offline and needs no network.\nSwipe down from the top-right for Control Center, then tap the airplane." = "Plai は完全にオフラインで動作し、ネットワークを必要としません。\n画面右上から下にスワイプしてコントロールセンターを開き、飛行機のアイコンをタップしてください。";
 "Offline" = "オフライン";
 "Network connection detected" = "ネットワーク接続を検出しました";
 "Model ready" = "モデルの準備完了";

@@ -4,7 +4,7 @@ import Network
 
 /// 监听设备当前有没有可用网络。
 ///
-/// iOS 没有公开 API 能查「飞行模式是否开启」—— 能查的只有网络可达性。对 Aero 来说这够了：
+/// iOS 没有公开 API 能查「飞行模式是否开启」—— 能查的只有网络可达性。对 Plai 来说这够了：
 /// 开了飞行模式必然无网。反过来不成立（关掉 Wi-Fi 和蜂窝也算无网），但那同样满足
 /// 「不被打扰」这个真正的目的。
 @MainActor
@@ -17,7 +17,7 @@ final class NetworkGate: ObservableObject {
     var allowsChat: Bool { isOffline }
 
     private let monitor = NWPathMonitor()
-    private let queue = DispatchQueue(label: "io.argoodies.aero.networkgate")
+    private let queue = DispatchQueue(label: "io.argoodies.plai.networkgate")
 
     init() {
         monitor.pathUpdateHandler = { [weak self] path in

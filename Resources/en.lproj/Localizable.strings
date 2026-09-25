@@ -26,7 +26,7 @@
 
 /* 飞行模式关卡 */
 "Turn on Airplane Mode" = "Turn on Airplane Mode";
-"Aero runs entirely offline and needs no network.\nSwipe down from the top-right for Control Center, then tap the airplane." = "Aero runs entirely offline and needs no network.\nSwipe down from the top-right for Control Center, then tap the airplane.";
+"Plai runs entirely offline and needs no network.\nSwipe down from the top-right for Control Center, then tap the airplane." = "Plai runs entirely offline and needs no network.\nSwipe down from the top-right for Control Center, then tap the airplane.";
 "Offline" = "Offline";
 "Network connection detected" = "Network connection detected";
 "Model ready" = "Model ready";

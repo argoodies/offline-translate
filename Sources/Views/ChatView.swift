@@ -317,7 +317,7 @@ private struct MessageBubble: View {
             // 全程走 Markdown，包括生成中途 —— 生成时用纯文本、结束后再渲染的话，
             // 最后一刻整段会重排一次。半截语法交给 MarkdownStabilizer 补齐。
             Markdown(MarkdownStabilizer.stabilized(message.text))
-                .markdownTheme(.aero)
+                .markdownTheme(.plai)
                 // 本地模型不会产出图片链接，而且这个 app 不联网 —— 换成只读 asset 的
                 // provider，彻底堵死 MarkdownUI 默认的远程图片加载。
                 .markdownImageProvider(.asset)
@@ -367,7 +367,7 @@ private struct MessageBubble: View {
 
 private extension Theme {
     /// MarkdownUI 的默认主题是给整页文档设计的，字号和段距放进气泡里太松散。
-    static let aero = Theme()
+    static let plai = Theme()
         .text {
             FontSize(UIFont.preferredFont(forTextStyle: .body).pointSize)
         }

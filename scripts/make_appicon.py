@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""生成 App 图标（1024×1024）—— 飞行模式。
+"""生成 App 图标（1024×1024）。
 
-白底黑飞机，跟 app 内部的配色一致。
+白底、中央一道黑色漩涡，右上角一枚黑色圆徽里嵌白色飞机 —— 跟 app 内部的黑白配色一致。
 
-注意这架飞机是这里手写的多边形，不是 SF Symbols 的字形。SF Symbols 的许可明确禁止
-把 symbol（以及「实质上或容易混淆地相似」的字形）用作 app icon，所以不能直接搬 —— 飞机
-剪影本身是通用符号，自己画没问题。
+注意飞机是这里手写的多边形，不是 SF Symbols 的字形。SF Symbols 的许可明确禁止把 symbol
+（以及「实质上或容易混淆地相似」的字形）用作 app icon，所以不能直接搬 —— 飞机剪影本身是
+通用符号，自己画没问题。
 
 iOS 自己会切圆角，所以这里画满整个方形、不留透明边 —— 带 alpha 的图标会被 App Store 拒。
 """
+import math
+
 from PIL import Image, ImageDraw, ImageFilter
 
 SIZE = 1024
@@ -18,7 +20,22 @@ OUTPUT = "Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png"
 TOP = (255, 255, 255)
 BOTTOM = (244, 244, 246)
 
-PLANE = (0, 0, 0)
+INK = (0, 0, 0)
+PAPER = (255, 255, 255)
+
+# 漩涡：中心略偏左下，把右上角让给徽章。数值都是画布比例。
+SPIRAL_CENTER = (0.45, 0.56)
+SPIRAL_RADIUS = 0.285
+SPIRAL_TURNS = 2.5
+SPIRAL_WIDTH = 0.050
+# 起笔半径。从正中心起笔的话头两圈会糊成一团黑，留个小空心当漩涡眼。
+SPIRAL_INNER = 0.055
+
+# 右上角的徽章，以及里面那架飞机。
+# 往内收一点：iOS 切圆角会啃掉右上角，贴太近的话徽章会缺一块。
+BADGE_CENTER = (0.725, 0.275)
+BADGE_RADIUS = 0.170
+PLANE_SCALE = 0.105
 
 # 飞机轮廓的一半。坐标归一化到 -1…1，先按机头朝上定义（x 向右、y 向上，机头在 (0, 1)），
 # 对称轴是纵轴，另一半镜像出来 —— 这样比直接写朝右的形状好读，也保证绝对对称。
@@ -64,7 +81,32 @@ def airplane_polygon(center, scale):
     return points
 
 
-def rounded_mask(size, polygon, radius):
+def spiral_points(center, inner, radius, turns, samples=4000):
+    """阿基米德螺旋：半径随角度线性增长，圈距才会均匀。"""
+    cx, cy = center
+    total = turns * 2 * math.pi
+    points = []
+    for i in range(samples + 1):
+        angle = total * i / samples
+        r = inner + (radius - inner) * angle / total
+        # 从 -90° 起笔，让外圈的收尾落在底部，把右上角空出来给徽章。
+        points.append((cx + r * math.cos(angle - math.pi / 2),
+                       cy + r * math.sin(angle - math.pi / 2)))
+    return points
+
+
+def draw_spiral(draw, center, inner, radius, turns, width):
+    """沿路径堆一串重叠的圆。
+
+    不用 draw.line：它把粗线拆成一段段独立的矩形，拐弯处的接缝糊不平，
+    在这种曲率上会留下一圈锯齿。采样够密时，圆点叠出来的边缘是光滑的。
+    """
+    r = width / 2
+    for x, y in spiral_points(center, inner, radius, turns):
+        draw.ellipse([x - r, y - r, x + r, y + r], fill=INK)
+
+
+def rounded_polygon_mask(size, polygon, radius):
     """画出多边形并把尖角磨圆。
 
     先模糊再按阈值切回硬边：模糊把角上的能量摊开，阈值再切一刀，等效于给每个顶点
@@ -82,13 +124,28 @@ def main():
     canvas = SIZE * supersample
 
     image = vertical_gradient(canvas, TOP, BOTTOM)
+    draw = ImageDraw.Draw(image)
 
-    # 机身转横之后比朝上时扁，放大到 0.40 才不会在画面里显得小。
-    polygon = airplane_polygon(center=(canvas / 2, canvas / 2), scale=canvas * 0.40)
-    mask = rounded_mask(canvas, polygon, radius=canvas * 0.012)
+    draw_spiral(
+        draw,
+        center=(SPIRAL_CENTER[0] * canvas, SPIRAL_CENTER[1] * canvas),
+        inner=SPIRAL_INNER * canvas,
+        radius=SPIRAL_RADIUS * canvas,
+        turns=SPIRAL_TURNS,
+        width=SPIRAL_WIDTH * canvas,
+    )
 
-    plane = Image.new("RGB", (canvas, canvas), PLANE)
-    image = Image.composite(plane, image, mask)
+    # 徽章底下先垫一圈白，把漩涡压住，否则线条会从徽章边缘钻出来。
+    bx, by = BADGE_CENTER[0] * canvas, BADGE_CENTER[1] * canvas
+    gap = BADGE_RADIUS * canvas * 0.10
+    outer = BADGE_RADIUS * canvas + gap
+    draw.ellipse([bx - outer, by - outer, bx + outer, by + outer], fill=PAPER)
+    r = BADGE_RADIUS * canvas
+    draw.ellipse([bx - r, by - r, bx + r, by + r], fill=INK)
+
+    plane = airplane_polygon(center=(bx, by), scale=PLANE_SCALE * canvas)
+    mask = rounded_polygon_mask(canvas, plane, radius=canvas * 0.004)
+    image = Image.composite(Image.new("RGB", (canvas, canvas), PAPER), image, mask)
 
     image = image.resize((SIZE, SIZE), Image.LANCZOS)
     image.save(OUTPUT)

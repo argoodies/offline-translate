@@ -25,7 +25,7 @@
 
 /* 飞行模式关卡 */
 "Turn on Airplane Mode" = "请打开飞行模式";
-"Aero runs entirely offline and needs no network.\nSwipe down from the top-right for Control Center, then tap the airplane." = "Aero 完全离线运行，不需要网络。\n从右上角下拉打开控制中心，点亮飞机图标。";
+"Plai runs entirely offline and needs no network.\nSwipe down from the top-right for Control Center, then tap the airplane." = "Plai 完全离线运行，不需要网络。\n从右上角下拉打开控制中心，点亮飞机图标。";
 "Offline" = "已离线";
 "Network connection detected" = "检测到网络连接";
 "Model ready" = "模型已就绪";

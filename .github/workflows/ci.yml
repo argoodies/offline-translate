@@ -76,8 +76,8 @@ jobs:
         run: |
           set -eo pipefail
           xcodebuild build \
-            -project Aero.xcodeproj \
-            -scheme Aero \
+            -project Plai.xcodeproj \
+            -scheme Plai \
             -configuration Debug \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO

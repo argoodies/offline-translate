@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct AeroApp: App {
+struct PlaiApp: App {
     @StateObject private var settings = AppSettings()
     @StateObject private var engine = ChatEngine()
     @StateObject private var store = ChatStore()

@@ -2,7 +2,7 @@ import SwiftUI
 
 /// 联网时挡在对话前面的那一页。
 ///
-/// Aero 的主张是「不被打扰」，所以入口就把这件事变成一个动作：去打开飞行模式。
+/// Plai 的主张是「不被打扰」，所以入口就把这件事变成一个动作：去打开飞行模式。
 /// 检测到断网后会自动放行，不需要用户再点什么 —— 也没有别的路可走，这是硬条件。
 struct AirplaneGateView: View {
     @EnvironmentObject private var gate: NetworkGate
@@ -32,7 +32,7 @@ struct AirplaneGateView: View {
                 .font(.title3.weight(.semibold))
                 .padding(.top, 28)
 
-            Text(L("Aero runs entirely offline and needs no network.\nSwipe down from the top-right for Control Center, then tap the airplane."))
+            Text(L("Plai runs entirely offline and needs no network.\nSwipe down from the top-right for Control Center, then tap the airplane."))
                 .font(.subheadline)
                 .foregroundStyle(Palette.inkSecondary)
                 .multilineTextAlignment(.center)
