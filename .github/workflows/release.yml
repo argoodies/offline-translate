@@ -20,6 +20,10 @@ on:
         description: 归档并上传 TestFlight
         type: boolean
         default: true
+      distribute:
+        description: 导出 ad-hoc 包并发布到 Fly 下载页
+        type: boolean
+        default: false
 
 env:
   # 必须和 scripts/build-llama-xcframework.sh 里的默认值一致，否则缓存会认错版本。
@@ -32,6 +36,9 @@ jobs:
   build:
     name: 编译并发布
     runs-on: macos-15
+    env:
+      # 上 TestFlight 和出 ad-hoc 下载包都要先归档，而一次归档够两边导出用。
+      NEEDS_ARCHIVE: ${{ github.event_name == 'workflow_dispatch' && (inputs.release || inputs.distribute) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -90,7 +97,7 @@ jobs:
 
       # 不发布的时候就验证能不能编译。归档本身也会编译一遍，所以真要发布时跳过这步。
       - name: Build (simulator)
-        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.release) }}
+        if: env.NEEDS_ARCHIVE != 'true'
         run: |
           set -eo pipefail
           xcodebuild build \
@@ -101,7 +108,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       - name: Write App Store Connect API key
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
+        if: env.NEEDS_ARCHIVE == 'true'
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
@@ -114,7 +121,7 @@ jobs:
       # 每次归档都会新建一张 "Created via API" 开发证书，配额满了归档就直接失败。
       # 归档前先清掉上次留下的 —— 下面那步需要时会重新建一张。
       - name: Revoke stale CI certificates
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
+        if: env.NEEDS_ARCHIVE == 'true'
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -125,7 +132,7 @@ jobs:
           "$RUNNER_TEMP/ascvenv/bin/python" scripts/revoke-stale-certs.py
 
       - name: Archive
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
+        if: env.NEEDS_ARCHIVE == 'true'
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -147,7 +154,7 @@ jobs:
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 
-      - name: Export .ipa
+      - name: Export .ipa (App Store)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
@@ -190,3 +197,65 @@ jobs:
             echo "::error::上传 App Store Connect 失败（详见上方 Validation 日志）"
             exit 1
           fi
+
+      # 下面是另一条出口：不走 TestFlight，导一个 ad-hoc 包挂到自己的下载页上。
+      # 用的是同一个 archive —— 签名方式是导出时才定的，归档不用重来。
+      #
+      # 必须是 ad-hoc 而不是 app-store：后者导出的包下载下来装不上，iOS 只认
+      # App Store 和 TestFlight 这两个来源。ad-hoc 能装，代价是只认开发者账号里
+      # 登记过的设备，换台没登记的手机点安装会直接失败。
+      - name: Export .ipa (ad-hoc)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.distribute }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -eo pipefail
+          cat > "$RUNNER_TEMP/ExportOptionsAdHoc.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>release-testing</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>destination</key><string>export</string>
+            <key>thinning</key><string>&lt;none&gt;</string>
+          </dict></plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/QW.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export-adhoc" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptionsAdHoc.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Publish install page to Fly
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.distribute }}
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -eo pipefail
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::error::缺少仓库 Secret FLY_API_TOKEN"
+            exit 1
+          fi
+
+          curl -fsSL https://fly.io/install.sh | sh
+          export PATH="$HOME/.fly/bin:$PATH"
+
+          APP=$(sed -n 's/^app = "\(.*\)"/\1/p' distribution/fly.toml)
+          HOST="${APP}.fly.dev"
+          IPA=$(find "$RUNNER_TEMP/export-adhoc" -name "*.ipa" | head -1)
+
+          ./scripts/make-install-site.sh "$IPA" "$HOST" "${{ github.run_number }}"
+
+          flyctl apps create "$APP" --org personal 2>/dev/null || true
+          flyctl deploy distribution \
+            --config distribution/fly.toml \
+            --remote-only --ha=false
+
+          echo "::notice::安装页 https://${HOST}"
+          echo "### 安装页 https://${HOST}" >> "$GITHUB_STEP_SUMMARY"

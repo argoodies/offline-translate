@@ -17,3 +17,6 @@ build/
 
 # macOS
 .DS_Store
+
+# CI 现生成的分发内容，含 500+ MB 的 .ipa
+distribution/site/

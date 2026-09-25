@@ -1,0 +1,21 @@
+# 分发页：一台 nginx，把 CI 导出的 ad-hoc .ipa 和 OTA 清单摆出来。
+#
+# 主机名后缀是随机的 —— 这页不设密码（itms-services 取清单时不会带凭据，
+# 加了 iOS 就装不了），靠不可猜的域名当作「不公开列出」。真正拦住别人的是签名本身：
+# ad-hoc 描述文件只认开发者账号里登记过的那几台设备。
+app = "qw-install-d84d2f"
+primary_region = "lax"
+
+[build]
+
+[http_service]
+  internal_port = 80
+  force_https = true
+  # 平时没人下载就停机，点进来再拉起。500 多 MB 的包放着不动不该一直烧机器。
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
