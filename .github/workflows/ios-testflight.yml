@@ -82,6 +82,18 @@ jobs:
           brew install xcodegen
           xcodegen generate
 
+      # 每次归档都会新建一张 "Created via API" 开发证书，配额满了归档就直接失败。
+      # 归档前先清掉上次留下的 —— 下面那步需要时会重新建一张。
+      - name: Revoke stale CI certificates
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -eo pipefail
+          python3 -m venv "$RUNNER_TEMP/ascvenv"
+          "$RUNNER_TEMP/ascvenv/bin/pip" install --quiet pyjwt cryptography
+          "$RUNNER_TEMP/ascvenv/bin/python" scripts/revoke-stale-certs.py
+
       - name: Archive
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}

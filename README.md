@@ -81,7 +81,9 @@ open QW.xcodeproj
 - `.github/workflows/ci.yml` —— push / PR 时编译验证（模拟器，不签名）。
 - `.github/workflows/ios-testflight.yml` —— 手动触发，归档并上传 TestFlight。
 
-上传需要仓库 secrets：`ASC_KEY_ID`、`ASC_ISSUER_ID`、`ASC_API_KEY_P8`。App Store Connect 侧复用已有的记录（app `6815647930`）；它的 bundle id 是当初用 Expo 建记录时自动生成的占位串，难看但已经在 Developer Portal 注册好，而且用户看不到它。
+上传需要仓库 secrets：`ASC_KEY_ID`、`ASC_ISSUER_ID`、`ASC_API_KEY_P8`。
+
+归档前会先跑 `scripts/revoke-stale-certs.py`。`xcodebuild -allowProvisioningUpdates` 每归档一次就新建一张名为 "Created via API" 的开发证书，账号配额不大，攒满之后归档直接报 *Your account has reached the maximum number of certificates* —— 这个坑踩过两次。那些证书没有别的用处（下次要用会重新建），所以每次先清掉上一轮留下的。脚本只动 displayName 正好是 "Created via API" 的开发证书，开发者本人的和唯一那张分发证书都不碰。App Store Connect 侧复用已有的记录（app `6815647930`）；它的 bundle id 是当初用 Expo 建记录时自动生成的占位串，难看但已经在 Developer Portal 注册好，而且用户看不到它。
 
 两个 workflow 都缓存 `llama.xcframework`（按 `LLAMA_REF`）和模型权重（按 `MODEL_KEY`），平时不会重编也不会重下。
 
