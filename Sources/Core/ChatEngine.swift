@@ -32,8 +32,18 @@ final class ChatEngine: ObservableObject {
     /// 上一次生成因为超长被裁掉了早期对话。
     @Published private(set) var didTrimHistory = false
     @Published private(set) var modelDescription: String?
-    /// 模型加载进度，0…1。半个 GB 的权重要映射好几秒，界面得有个交代。
+    /// 模型加载进度，0…1。半个 GB 的权重要读好几秒，界面得有个交代。
     @Published private(set) var loadProgress: Double = 0
+
+    /// 加载现在走到哪一步了。界面照着这个如实写，不编。
+    enum LoadStage {
+        /// 从包里读权重。这一步占 0…0.9，有真实进度。
+        case weights
+        /// 建上下文：分配 KV cache、建计算图，首次启动还要编 Metal 内核。
+        /// 这一步 llama.cpp 不报进度，只能说一声在做。
+        case preparingContext
+    }
+    @Published private(set) var loadStage: LoadStage = .weights
 
     private let bridge = LlamaBridge()
     private var currentTask: Task<Void, Never>?
@@ -57,6 +67,7 @@ final class ChatEngine: ObservableObject {
         currentTask?.cancel()
         phase = .loadingModel
         loadProgress = 0
+        loadStage = .weights
 
         var config = LlamaBridge.Config()
         config.gpuLayers = AppSettings.gpuLayers
@@ -75,6 +86,10 @@ final class ChatEngine: ObservableObject {
                     // 映射到 0…0.9，末尾留给它：进度条停在 90% 是实话，
                     // 停在 100% 却还要等，是在说已经好了。
                     self?.loadProgress = progress * 0.9
+                }
+            } onPreparingContext: {
+                Task { @MainActor [weak self] in
+                    self?.loadStage = .preparingContext
                 }
             }
             loadedModelPath = url.path

@@ -2,10 +2,9 @@ import SwiftUI
 
 /// 所有笔记。
 ///
-/// 这一页上没有一个词：标题是产品名，动作全是图形，日期和条数是数字。
-/// 原先的「删除全部」和「重命名」都拿掉了 —— 两者都要弹一个带
-/// 「取消 / 确定」的对话框，而那必然是某一种语言。删除还在，逐条左滑；
-/// 标题不用改，跟备忘录一样取正文第一行。
+/// 这一页上只有「New note」一处文字，其余是图形和数字。
+/// 「删除全部」和「重命名」都拿掉了 —— 两者都要弹一个带「取消 / 确定」的对话框。
+/// 删除还在，逐条左滑；标题不用改，跟备忘录一样取正文第一行。
 struct ConversationListView: View {
     @EnvironmentObject private var store: ChatStore
     @EnvironmentObject private var engine: ChatEngine
@@ -42,19 +41,19 @@ struct ConversationListView: View {
         }
     }
 
-    /// 一支笔，没有字。圆形而不是胶囊 —— 少了标签之后，胶囊里裹着一个小图标
-    /// 两头空荡荡的，圆形才收得住。
+    /// 新建。带上文字之后重新用回胶囊 —— 圆形是为了裹住一个孤零零的图标才选的，
+    /// 现在里面有内容撑着，胶囊的两头就不空了。
     private var newNoteButton: some View {
         Button {
             select(store.startNewConversation())
         } label: {
-            Image(systemName: "square.and.pencil")
-                .font(.system(size: 20, weight: .medium))
+            Label("New note", systemImage: "square.and.pencil")
+                .font(.body.weight(.medium))
                 .foregroundStyle(Palette.canvas)
-                .frame(width: 56, height: 56)
-                .background(Palette.ink, in: Circle())
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
+                .background(Palette.ink, in: Capsule())
         }
-        .accessibilityLabel("New note")
         .padding(.bottom, 20)
     }
 

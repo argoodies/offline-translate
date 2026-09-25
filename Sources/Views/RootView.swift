@@ -22,16 +22,19 @@ struct RootView: View {
         switch engine.phase {
         case .loadingModel:
             loadingScreen.transition(.opacity)
-        case .loadFailed:
-            failureScreen(modelURL: modelURL).transition(.opacity)
+        case .loadFailed(let message):
+            failureScreen(message, modelURL: modelURL).transition(.opacity)
         case .ready, .generating, .failed:
             // .failed 是单轮生成出错，模型还在 —— 留在文档里，下一段接着写。
             NoteView().transition(.opacity)
         }
     }
 
-    /// 首次启动要把半 GB 权重读进来，得有几秒。
-    /// 进度来自 llama.cpp 的加载回调，不是假动画 —— 会动的只是那道扫光。
+    /// 首次启动要把半 GB 权重读进来，得有一阵。
+    ///
+    /// 进度来自 llama.cpp 的加载回调，不是假动画；文案也不糊弄 —— 两步各说各的，
+    /// 因为这两步的体感完全不同：读权重有进度可看，建上下文那一步什么都不动，
+    /// 只说「Loading」的话正好在最难熬的那几秒里显得像卡死了。
     private var loadingScreen: some View {
         // ignoresSafeArea 要加在 ZStack 上而不是那层底色上。只染底色的话，
         // ZStack 自己仍然被安全区框着，内容居中的是安全区 —— 刘海和 Home 指示条
@@ -46,34 +49,61 @@ struct RootView: View {
 
                 LoadingBar(progress: engine.loadProgress)
                     .frame(width: 180, height: 4)
+
+                Text(loadingCaption)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.inkSecondary)
+                    .animation(.easeOut(duration: 0.2), value: loadingCaption)
             }
         }
         .ignoresSafeArea()
     }
 
+    /// 如实写现在在干什么。
+    ///
+    /// 「Reading weights」就是在从包里读那 507 MB；「Preparing the GPU」是在分配
+    /// KV cache、建计算图，首次启动还要编 Metal 内核。没写「Compiling shaders」是
+    /// 因为那只有第一次成立，之后走的是系统缓存 —— 每次都那么说就是假话了。
+    private var loadingCaption: String {
+        switch engine.loadStage {
+        case .weights: return "Reading weights"
+        case .preparingContext: return "Preparing the GPU"
+        }
+    }
+
     /// 加载失败给条退路。否则只能杀掉 app 重开 —— 而重开多半也是同样的结果。
     ///
-    /// 原先这里写着失败原因和一个「Try again」按钮。现在只剩两个图形：一个惊叹号
-    /// 说明出事了，一个转圈箭头说明能重来。具体是哪种错误对用户没用 —— 能做的
-    /// 只有再试一次，而这一点图标已经说清楚了。
-    private func failureScreen(modelURL: URL) -> some View {
+    /// 把 llama.cpp 报的原话写上。「模型文件坏了」和「内存不够」该做的事不一样，
+    /// 一个笼统的惊叹号把这个区别抹平了 —— 而这正好是用户唯一需要知道的东西。
+    private func failureScreen(_ message: String, modelURL: URL) -> some View {
         ZStack {
             Palette.canvas
-            VStack(spacing: 28) {
+            VStack(spacing: 16) {
                 Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 38, weight: .light))
+                    .font(.system(size: 34, weight: .light))
                     .foregroundStyle(Palette.inkSecondary)
+
+                Text("Could not load the model")
+                    .font(.headline)
+                    .foregroundStyle(Palette.ink)
+
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.inkSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 44)
 
                 Button {
                     Task { await engine.loadModel(at: modelURL) }
                 } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 20, weight: .medium))
+                    Text("Try again")
+                        .font(.subheadline.weight(.medium))
                         .foregroundStyle(Palette.canvas)
-                        .frame(width: 56, height: 56)
-                        .background(Palette.ink, in: Circle())
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 11)
+                        .background(Palette.ink, in: Capsule())
                 }
-                .accessibilityLabel("Try again")
+                .padding(.top, 8)
             }
         }
         .ignoresSafeArea()

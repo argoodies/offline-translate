@@ -71,11 +71,16 @@ actor LlamaBridge {
 
     // MARK: - 生命周期
 
-    /// 加载模型。`onProgress` 会在加载过程中被反复调用，参数是 0…1 的进度。
+    /// 加载分两步，界面要如实说现在在哪一步，所以两步各有一个回调。
+    ///
+    /// - `onProgress`：读权重的进度，0…1。只有这一步 llama.cpp 会报进度。
+    /// - `onPreparingContext`：权重读完了，开始建上下文 —— 分配 KV cache、建计算图，
+    ///   首次启动还要编 Metal 内核。这一步没有进度可报，只能说一声开始了。
     func load(
         modelPath: String,
         config: Config = Config(),
-        onProgress: ((Double) -> Void)? = nil
+        onProgress: ((Double) -> Void)? = nil,
+        onPreparingContext: (() -> Void)? = nil
     ) throws {
         unload()
         self.config = config
@@ -118,6 +123,8 @@ actor LlamaBridge {
         }
         model = loadedModel
         vocab = llama_model_get_vocab(loadedModel)
+
+        onPreparingContext?()
 
         var contextParams = llama_context_default_params()
         contextParams.n_ctx = config.contextSize
