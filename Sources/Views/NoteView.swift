@@ -102,10 +102,20 @@ struct NoteView: View {
         .contextMenu { actions(for: message) }
     }
 
-    /// 正在写出来的回答。光标直接跟在文字末尾，像有人在敲。
+    /// 正在写出来的回答，末尾跟一根呼吸的光标。
+    ///
+    /// 光标是独立的 View 而不是拼在文本里的字符 —— 字符没法做淡入淡出。
+    /// 代价是它只能跟在整个 Markdown 块之后：块级渲染没有办法把一个会动的 View
+    /// 塞进富文本流的末尾。回答短的时候它紧贴着文字，长到换行之后会落在行尾右侧。
+    ///
+    /// 首个 token 到达前 streamingText 是空的，这时画面上只剩这根光标 ——
+    /// 正好替掉了原先那个转圈，更像"对方正在写"。
     private var answerInProgress: some View {
-        answerBody(engine.streamingText + "▌")
-            .frame(maxWidth: .infinity, alignment: .leading)
+        HStack(alignment: .lastTextBaseline, spacing: 3) {
+            answerBody(engine.streamingText)
+            TypingCursor()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// 模型回答的正文。
@@ -281,4 +291,24 @@ private extension Theme {
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .markdownMargin(top: 6, bottom: 12)
         }
+}
+
+/// 打字光标：一根呼吸的竖线。
+private struct TypingCursor: View {
+    /// 跟着正文字号走，换了动态字体也不会一根竖线孤零零地长在那儿。
+    @ScaledMetric(relativeTo: .body) private var height: CGFloat = 19
+
+    @State private var dimmed = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 1)
+            .fill(Palette.ink)
+            .frame(width: 2, height: height)
+            // Shape 没有文字基线，靠它自己对齐会浮在半空；按底部往下压一点，
+            // 才和同一行的文字坐在一条线上。
+            .alignmentGuide(.lastTextBaseline) { $0[.bottom] - 3 }
+            .opacity(dimmed ? 0 : 1)
+            .animation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true), value: dimmed)
+            .onAppear { dimmed = true }
+    }
 }
