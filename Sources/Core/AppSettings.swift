@@ -19,14 +19,21 @@ enum AppSettings {
     static let gpuLayers: Int32 = 20
     /// 权重怎么读进来。
     ///
-    /// 一度是 MMAP，以为能按页取用。但 `lazy_mode` 默认的 AUTO 只对超过 4 GiB 的
-    /// 单个张量生效，0.8B 里没有 —— 头文件的原话是「always read the whole tensor
-    /// up front」。于是整个文件照样要全部落地，mmap 只是把一次顺序读换成了三万多次
-    /// 缺页中断，省不下内存，还慢。开了 Metal 之后更是如此：GPU buffer 直接包住这块
-    /// 内存，权重必须全部常驻。
+    /// 这里绕了一圈，结论值得记下来。
     ///
-    /// DIRECT_IO 走顺序大块读。同样待实测 —— 换回 MMAP 改这一个值就行。
-    static let loadMode = LLAMA_LOAD_MODE_DIRECT_IO
+    /// mmap 并不像注释里曾经写的那样「按页取用、常驻远低于文件大小」：`lazy_mode`
+    /// 默认的 AUTO 只对单个超过 4 GiB 的张量生效，0.8B 里没有那种张量，所以走的是
+    /// 头文件里那条「always read the whole tensor up front」—— 整个文件照样会被读完。
+    /// 于是它看起来只是把一次顺序读换成了三万多次缺页中断，白亏。
+    ///
+    /// 照这个推论换成 DIRECT_IO，结果是加载必然在建上下文那一步失败。差别不在读法，
+    /// 在这块内存的性质：mmap 的页是文件背书的，系统随时可以丢掉、要用再读回来；
+    /// DIRECT_IO 读出来的是脏内存，一分都退不掉。507 MB 脏内存之上再要 KV cache
+    /// 和 Metal 缓冲，iOS 直接不给。
+    ///
+    /// 所以那三万次缺页中断是这半个 G 能塞进一个 app 的入场费，买不掉。
+    /// 真想省启动时间，得从别处下手（更小的量化、更少的 offload 层）。
+    static let loadMode = LLAMA_LOAD_MODE_MMAP
     /// 上下文越大越能记住长对话，但 KV cache 会线性吃内存 —— 而这块内存是在
     /// `llama_init_from_model` 里一次性分配好的，进度条走完之后那段等待就有它一份。
     /// 4096 砍到 2048，分配量减半；代价是能记住的轮数也减半。
