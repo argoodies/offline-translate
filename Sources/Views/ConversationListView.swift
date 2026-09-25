@@ -19,6 +19,8 @@ struct ConversationListView: View {
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
             .background(Palette.canvas)
+            // 新建浮在列表下方 —— 这是这一页最主要的动作，不该藏进右上角的菜单里。
+            .safeAreaInset(edge: .bottom) { newNoteButton }
             .navigationTitle(L("Notes"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Palette.canvas, for: .navigationBar)
@@ -28,20 +30,13 @@ struct ConversationListView: View {
                     Button(L("Close")) { dismiss() }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button {
-                            select(store.startNewConversation())
-                        } label: {
-                            Label(L("New note"), systemImage: "square.and.pencil")
-                        }
-                        Button(role: .destructive) {
-                            showDeleteAllConfirmation = true
-                        } label: {
-                            Label(L("Delete all"), systemImage: "trash")
-                        }
+                    Button(role: .destructive) {
+                        showDeleteAllConfirmation = true
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Image(systemName: "trash")
+                            .foregroundStyle(Palette.ink)
                     }
+                    .accessibilityLabel(L("Delete all"))
                 }
             }
             .confirmationDialog(
@@ -65,6 +60,20 @@ struct ConversationListView: View {
                 }
             }
         }
+    }
+
+    private var newNoteButton: some View {
+        Button {
+            select(store.startNewConversation())
+        } label: {
+            Label(L("New note"), systemImage: "square.and.pencil")
+                .font(.body.weight(.medium))
+                .foregroundStyle(Palette.canvas)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
+                .background(Palette.ink, in: Capsule())
+        }
+        .padding(.bottom, 20)
     }
 
     private var renameBinding: Binding<Bool> {
