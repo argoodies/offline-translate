@@ -2,7 +2,8 @@
 """生成 App 图标和 app 内用的 logo：白底黑字 QW。
 
 iOS 会给 App 图标切圆角，所以那张画满整个方形、不留透明边 —— 带 alpha 的图标会被
-App Store 拒。app 内那张反过来要透明底。
+App Store 拒。app 内那张要自己切圆角，并且同样带白底：标识该是恒定的，
+不能在深色模式下反色，也不能糊在黑底上。
 """
 from PIL import Image, ImageDraw, ImageFont
 
@@ -88,10 +89,18 @@ def main():
     icon.resize((ICON_SIZE, ICON_SIZE), Image.LANCZOS).save(ICON_OUTPUT)
     print(f"wrote {ICON_OUTPUT} ({ICON_SIZE}×{ICON_SIZE})")
 
-    # app 内那张要透明底，才能贴在任何背景上。
+    # app 内那张跟图标长一个样：白底黑字，自带圆角。
+    # 不做成透明底跟着前景色走 —— 那样深色模式下要么得反色（标识就不恒定了），
+    # 要么直接糊在黑底上。自带白底，深浅色下都是同一个它。
     canvas = LOGO_SIZE * supersample
-    logo = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
-    logo.paste(Image.new("RGBA", (canvas, canvas), INK + (255,)), mask=text_mask(canvas))
+    logo = vertical_gradient(canvas, TOP, BOTTOM).convert("RGBA")
+    logo = Image.composite(Image.new("RGBA", (canvas, canvas), INK + (255,)),
+                           logo, text_mask(canvas))
+    # 圆角半径取 iOS 图标那套比例，这样它在 app 里和主屏上的图标是同一个形状。
+    corner = Image.new("L", (canvas, canvas), 0)
+    ImageDraw.Draw(corner).rounded_rectangle(
+        [0, 0, canvas - 1, canvas - 1], radius=canvas * 0.2237, fill=255)
+    logo.putalpha(corner)
     logo.resize((LOGO_SIZE, LOGO_SIZE), Image.LANCZOS).save(LOGO_OUTPUT)
     print(f"wrote {LOGO_OUTPUT} ({LOGO_SIZE}×{LOGO_SIZE})")
 
