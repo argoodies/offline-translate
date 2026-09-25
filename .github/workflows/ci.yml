@@ -76,8 +76,8 @@ jobs:
         run: |
           set -eo pipefail
           xcodebuild build \
-            -project Plai.xcodeproj \
-            -scheme Plai \
+            -project QWHD.xcodeproj \
+            -scheme QWHD \
             -configuration Debug \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO

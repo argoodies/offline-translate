@@ -4,7 +4,7 @@
 # 而且 llama.xcframework 是 CI 现场编出来的，路径要在生成时才确定。
 #
 #   brew install xcodegen && xcodegen generate
-name: Plai
+name: QWHD
 
 options:
   bundleIdPrefix: io.argoodies
@@ -33,7 +33,7 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: NO
 
 targets:
-  Plai:
+  QWHD:
     type: application
     platform: iOS
     sources:
@@ -58,10 +58,11 @@ targets:
         # 这串是当初用 Expo 建 App 时自动生成的占位 identifier，难看但已经注册好了；
         # 该记录还没有任何构建，真想换成 io.argoodies.* 只能去网页端改，API 改不了 bundleId。
         PRODUCT_BUNDLE_IDENTIFIER: dev.expo.client.cdk6asipshwbwfmintawzxd2uwcbu5iejxt3t4gqkoq4o
-        PRODUCT_NAME: Plai
+        PRODUCT_NAME: QWHD
         INFOPLIST_FILE: Resources/Info.plist
         GENERATE_INFOPLIST_FILE: NO
-        TARGETED_DEVICE_FAMILY: "1,2"
+        # 只做 iPad。iPhone 上装不了 —— 这个 app 是按大屏设计的。
+        TARGETED_DEVICE_FAMILY: "2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         SWIFT_EMIT_LOC_STRINGS: YES

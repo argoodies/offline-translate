@@ -5,7 +5,7 @@ import SwiftUI
 /// 只有黑白灰：白底黑字，没有强调色。所有灰阶都是中性灰，不用系统那套带蓝调的
 /// `systemGray` —— 混在纯白背景上能看出偏色。
 ///
-/// 界面锁定浅色外观（见 `PlaiApp`），所以这里可以写死具体明度，不必区分深浅模式。
+/// 界面锁定浅色外观（见 `QWHDApp`），所以这里可以写死具体明度，不必区分深浅模式。
 enum Palette {
     /// 页面底色。
     static let canvas = Color.white
