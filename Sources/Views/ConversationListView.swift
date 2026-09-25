@@ -17,8 +17,12 @@ struct ConversationListView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Palette.canvas)
             .navigationTitle(String(localized: "对话"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Palette.canvas, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(String(localized: "关闭")) { dismiss() }
@@ -75,7 +79,7 @@ struct ConversationListView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(conversation.title)
                         .font(.body)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                     HStack(spacing: 6) {
                         Text(conversation.updatedAt, format: .relative(presentation: .named))
@@ -85,13 +89,13 @@ struct ConversationListView: View {
                         }
                     }
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.inkSecondary)
                 }
                 Spacer()
                 if conversation.id == store.currentID {
                     Image(systemName: "checkmark")
                         .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.tint)
+                        .foregroundStyle(Palette.ink)
                 }
             }
         }
@@ -108,7 +112,7 @@ struct ConversationListView: View {
             } label: {
                 Label(String(localized: "重命名"), systemImage: "pencil")
             }
-            .tint(.gray)
+            .tint(Palette.inkSecondary)
         }
     }
 

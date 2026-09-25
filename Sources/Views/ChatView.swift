@@ -24,6 +24,8 @@ struct ChatView: View {
             }
             .navigationTitle(store.current?.title ?? String(localized: "新对话"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Palette.canvas, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
@@ -81,16 +83,16 @@ struct ChatView: View {
                     Spacer()
                 }
                 .font(.caption2)
-                .foregroundStyle(.orange)
+                .foregroundStyle(Palette.inkSecondary)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 6)
 
                 ProgressView(value: engine.contextUsage)
                     .progressViewStyle(.linear)
-                    .tint(.orange)
+                    .tint(Palette.ink)
                     .frame(height: 2)
             }
-            .background(.bar)
+            .background(Palette.canvas)
         }
     }
 
@@ -124,6 +126,7 @@ struct ChatView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 16)
             }
+            .background(Palette.canvas)
             .scrollDismissesKeyboard(.interactively)
             .onChange(of: store.currentMessages.count) { _ in
                 scrollToBottom(proxy, animated: true)
@@ -152,13 +155,13 @@ struct ChatView: View {
         VStack(spacing: 10) {
             Image(systemName: "airplane")
                 .font(.system(size: 40, weight: .light))
-                .foregroundStyle(.tint)
+                .foregroundStyle(Palette.ink)
                 .rotationEffect(.degrees(-90))
             Text(String(localized: "全程离线"))
                 .font(.headline)
             Text(String(localized: "模型跑在这台设备上，对话不会离开你的手机。"))
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.inkSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -173,10 +176,11 @@ struct ChatView: View {
             if case .failed(let message) = engine.phase {
                 Label(message, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Palette.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 10)
+                    .background(Palette.surfaceSunken)
             }
 
             Divider()
@@ -187,7 +191,7 @@ struct ChatView: View {
                     .lineLimit(1...5)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 9)
-                    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
+                    .background(Palette.field, in: RoundedRectangle(cornerRadius: 20))
 
                 if engine.isGenerating {
                     Button {
@@ -212,7 +216,7 @@ struct ChatView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
-        .background(.bar)
+        .background(Palette.canvas)
     }
 
     private var canSend: Bool {
@@ -269,7 +273,7 @@ private struct MessageBubble: View {
                 if message.isTruncated {
                     Label(String(localized: "回复因长度上限被截断"), systemImage: "scissors")
                         .font(.caption2)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Palette.inkTertiary)
                 }
 
             }
@@ -308,7 +312,7 @@ private struct MessageBubble: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .background(bubbleBackground)
-                .foregroundStyle(Color.white)
+                .foregroundStyle(Palette.bubbleUserText)
                 .clipShape(RoundedRectangle(cornerRadius: 18))
         } else if isStreaming {
             // 生成过程中用纯文本：半截的 Markdown（没闭合的代码块、写了一半的表格）
@@ -336,8 +340,8 @@ private struct MessageBubble: View {
 
     private var bubbleBackground: some ShapeStyle {
         message.role == .user
-            ? AnyShapeStyle(Color.accentColor)
-            : AnyShapeStyle(Color(.secondarySystemBackground))
+            ? AnyShapeStyle(Palette.bubbleUser)
+            : AnyShapeStyle(Palette.bubbleAssistant)
     }
 
     private func reasoningBlock(_ reasoning: String) -> some View {
@@ -352,18 +356,18 @@ private struct MessageBubble: View {
                         .font(.caption2)
                 }
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.inkSecondary)
             }
             .buttonStyle(.plain)
 
             if showReasoning {
                 Text(reasoning)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.inkSecondary)
                     .textSelection(.enabled)
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                    .background(Palette.surfaceSunken, in: RoundedRectangle(cornerRadius: 12))
             }
         }
     }
@@ -397,7 +401,7 @@ private extension Theme {
                     }
                     .padding(12)
             }
-            .background(Color(.tertiarySystemBackground))
+            .background(Palette.surfaceSunken)
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .markdownMargin(top: 6, bottom: 10)
         }

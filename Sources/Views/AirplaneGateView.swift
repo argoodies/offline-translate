@@ -17,13 +17,13 @@ struct AirplaneGateView: View {
 
             ZStack {
                 Circle()
-                    .fill(Color.accentColor.opacity(0.12))
+                    .fill(Palette.surfaceSunken)
                     .frame(width: 132, height: 132)
                     .scaleEffect(pulsing ? 1.08 : 0.94)
 
                 Image(systemName: "airplane")
                     .font(.system(size: 54, weight: .light))
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(Palette.ink)
                     .rotationEffect(.degrees(-90))
             }
             .animation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true), value: pulsing)
@@ -35,7 +35,7 @@ struct AirplaneGateView: View {
 
             Text(String(localized: "Aero 完全离线运行，不需要网络。\n从右上角下拉打开控制中心，点亮飞机图标。"))
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.inkSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.top, 10)
                 .padding(.horizontal, 36)
@@ -53,11 +53,11 @@ struct AirplaneGateView: View {
                 gate.userBypassed = true
             }
             .font(.footnote)
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(Palette.inkTertiary)
             .padding(.bottom, 28)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .background(Palette.canvas)
     }
 
     /// 等飞行模式的这段时间里模型也在加载，让用户看得到进度。
@@ -69,30 +69,31 @@ struct AirplaneGateView: View {
                 Text(String(localized: "正在加载模型…"))
             }
             .font(.caption2)
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(Palette.inkTertiary)
         } else if engine.phase == .ready {
             HStack(spacing: 5) {
                 Image(systemName: "checkmark.circle.fill")
                 Text(String(localized: "模型已就绪"))
             }
             .font(.caption2)
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(Palette.inkTertiary)
         }
     }
 
     private var statusPill: some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(gate.isOffline ? Color.green : Color.orange)
-                .frame(width: 8, height: 8)
+                .strokeBorder(Palette.ink, lineWidth: 1.5)
+                .background(Circle().fill(gate.isOffline ? Palette.ink : Color.clear))
+                .frame(width: 9, height: 9)
             Text(gate.isOffline
                  ? String(localized: "已离线")
                  : String(localized: "检测到网络连接"))
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.inkSecondary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(Color(.secondarySystemBackground), in: Capsule())
+        .background(Palette.surfaceSunken, in: Capsule())
     }
 }

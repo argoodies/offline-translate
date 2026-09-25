@@ -13,6 +13,7 @@
 | 模型 | [Qwen3.5-0.8B](https://huggingface.co/Qwen/Qwen3.5-0.8B) GGUF，Q4_K_M（507 MB），随包安装 | 这个体积档里综合能力最好的一批，支持 201 种语言 |
 | Markdown | [swift-markdown-ui](https://github.com/gonzalezreal/swift-markdown-ui) 2.4 | 系统的 `AttributedString(markdown:)` 不支持代码块和表格 |
 | 朗读 | 系统 `AVSpeechSynthesizer` | 设备上已装的语音包同样离线；长按消息触发 |
+| 配色 | 白底黑字，锁定浅色外观 | 见 `Palette.swift`，只有黑白灰，没有强调色 |
 | 工程文件 | XcodeGen（`project.yml`） | `.xcodeproj` 不进仓库，避免 pbxproj 的合并地狱 |
 
 ```
@@ -24,6 +25,7 @@ Sources/
     Conversation.swift    消息与会话模型，本地 JSON 存储
     BundledModel.swift    定位 bundle 里的权重文件
     NetworkGate.swift     NWPathMonitor，判断当前是否离线
+    Palette.swift         全 app 的黑白灰配色
     SpeechReader.swift    朗读回复，按回复语言选系统语音
     AppSettings.swift     用户设置
   Views/
@@ -58,6 +60,8 @@ open Aero.xcodeproj
 需要说清楚的是，iOS **没有公开 API 能查「飞行模式是否开启」**，能查的只有网络可达性（`NWPathMonitor`）。开了飞行模式必然无网，但反过来不成立 —— 关掉 Wi-Fi 和蜂窝也算。对这个 app 来说效果等价，文案按飞行模式写。这一页还留了个「仍要继续」的出口：状态判断依赖系统回调，真出现误判时不该把人锁死在启动页。
 
 **App 图标是自己画的飞机，不是 SF Symbol。** Apple 的 SF Symbols 许可禁止把 symbol（以及「实质上或容易混淆地相似」的字形）用作 app icon，并保留要求整改的权利。飞机剪影本身是通用符号，所以 `scripts/make_appicon.py` 用多边形画了一个：先在 4 倍画布上填充，再靠「高斯模糊 + 阈值」把尖角统一磨圆 —— 比在每个顶点手工插贝塞尔控制点省事得多。
+
+**界面锁定浅色外观。** 白底黑字是设定而不是默认值，跟随系统深色会把整套配色反过来，所以在根视图上钉了 `.preferredColorScheme(.light)`。灰阶全部用中性灰而不是系统那套 `systemGray` —— 后者带蓝调，铺在纯白上能看出偏色。用户消息反过来用黑底白字，是界面上唯一的大块深色。
 
 **流式时不渲染 Markdown。** 生成中途的 Markdown 是半截的 —— 没闭合的代码块、写了一半的表格 —— 每 50 毫秒重新解析一次会让界面疯狂闪烁。所以生成时走纯文本，收尾后再交给 MarkdownUI。图片 provider 换成了只读 asset 的版本，堵死它默认的远程图片加载：这个 app 不该有任何出网路径。
 

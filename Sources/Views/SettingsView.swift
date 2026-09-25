@@ -13,8 +13,12 @@ struct SettingsView: View {
                 performanceSection
                 aboutSection
             }
+            .scrollContentBackground(.hidden)
+            .background(Palette.canvas)
             .navigationTitle(String(localized: "设置"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Palette.canvas, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(String(localized: "完成")) { dismiss() }

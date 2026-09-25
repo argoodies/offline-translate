@@ -34,15 +34,15 @@ struct RootView: View {
     /// 首次启动要把半 GB 权重 mmap 起来，有一两秒空窗，不挡一下会看到一个空白的对话界面。
     private var launchScreen: some View {
         ZStack {
-            Color(.systemBackground).ignoresSafeArea()
+            Palette.canvas.ignoresSafeArea()
             VStack(spacing: 16) {
                 Image(systemName: "airplane")
                     .font(.system(size: 48, weight: .light))
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(Palette.ink)
                     .rotationEffect(.degrees(-90))
                 Text(String(localized: "正在加载模型…"))
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.inkSecondary)
             }
         }
     }
@@ -52,13 +52,15 @@ struct RootView: View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 40, weight: .light))
-                .foregroundStyle(.orange)
+                .foregroundStyle(Palette.inkSecondary)
             Text(String(localized: "安装包里缺少模型文件"))
                 .font(.headline)
             Text(String(localized: "这个构建不完整，请重新安装。"))
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.inkSecondary)
         }
         .padding(40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Palette.canvas)
     }
 }
