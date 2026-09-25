@@ -154,49 +154,9 @@ jobs:
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 
-      - name: Export .ipa (App Store)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-        run: |
-          set -eo pipefail
-          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0"><dict>
-            <key>method</key><string>app-store</string>
-            <key>teamID</key><string>${TEAM_ID}</string>
-            <key>signingStyle</key><string>automatic</string>
-            <key>destination</key><string>export</string>
-          </dict></plist>
-          PLIST
-
-          xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/QW.xcarchive" \
-            -exportPath "$RUNNER_TEMP/export" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
-
-      - name: Upload to TestFlight
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-        run: |
-          set -eo pipefail
-          IPA=$(find "$RUNNER_TEMP/export" -name "*.ipa" | head -1)
-          echo "ipa=$IPA"
-          # altool 遇到 409 之类的错误仍然 exit 0，只把 ERROR 打到 stdout，必须解析日志才知道成败。
-          xcrun altool --upload-app -f "$IPA" -t ios \
-            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" 2>&1 | tee "$RUNNER_TEMP/altool.log"
-          if grep -qiE 'ERROR:|Validation failed' "$RUNNER_TEMP/altool.log"; then
-            echo "::error::上传 App Store Connect 失败（详见上方 Validation 日志）"
-            exit 1
-          fi
+      # 先出 ad-hoc 下载页，再上 TestFlight。顺序是有意的：上传那步会撞 App Store
+      # Connect 的每日配额（409），而一个步骤挂了后面的就不跑了 —— 排在后面的话，
+      # 一次配额用尽会连带把下载页也赔进去。下载页这边没有配额，先把它落地。
 
       # 下面是另一条出口：不走 TestFlight，导一个 ad-hoc 包挂到自己的下载页上。
       # 用的是同一个 archive —— 签名方式是导出时才定的，归档不用重来。
@@ -260,3 +220,48 @@ jobs:
 
           echo "::notice::安装页 https://${HOST}"
           echo "### 安装页 https://${HOST}" >> "$GITHUB_STEP_SUMMARY"
+
+
+      - name: Export .ipa (App Store)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -eo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>destination</key><string>export</string>
+          </dict></plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/QW.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Upload to TestFlight
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -eo pipefail
+          IPA=$(find "$RUNNER_TEMP/export" -name "*.ipa" | head -1)
+          echo "ipa=$IPA"
+          # altool 遇到 409 之类的错误仍然 exit 0，只把 ERROR 打到 stdout，必须解析日志才知道成败。
+          xcrun altool --upload-app -f "$IPA" -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" 2>&1 | tee "$RUNNER_TEMP/altool.log"
+          if grep -qiE 'ERROR:|Validation failed' "$RUNNER_TEMP/altool.log"; then
+            echo "::error::上传 App Store Connect 失败（详见上方 Validation 日志）"
+            exit 1
+          fi
