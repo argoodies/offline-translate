@@ -365,9 +365,9 @@ enum LlamaError: LocalizedError {
         case .decodeFailed(let code):
             return L("Inference failed (code \(code)).")
         case .contextExhausted:
-            return L("The context is full. Please start a new chat.")
+            return L("The context is full. Please start a new note.")
         case .promptTooLong(let promptTokens, let contextSize):
-            return L("This conversation is too long (\(promptTokens) tokens, limit \(contextSize)). Please start a new chat.")
+            return L("This conversation is too long (\(promptTokens) tokens, limit \(contextSize)). Please start a new note.")
         }
     }
 }

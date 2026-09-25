@@ -25,8 +25,8 @@ struct RootView: View {
         case .loadFailed(let message):
             failureScreen(message, modelURL: modelURL).transition(.opacity)
         case .ready, .generating, .failed:
-            // .failed 是单轮生成出错，模型还在 —— 留在对话里，由输入栏上方提示。
-            ChatView().transition(.opacity)
+            // .failed 是单轮生成出错，模型还在 —— 留在文档里，下一段接着写。
+            NoteView().transition(.opacity)
         }
     }
 

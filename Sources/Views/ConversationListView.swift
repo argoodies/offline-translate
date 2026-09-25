@@ -19,7 +19,7 @@ struct ConversationListView: View {
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
             .background(Palette.canvas)
-            .navigationTitle(L("Chats"))
+            .navigationTitle(L("Notes"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Palette.canvas, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -32,7 +32,7 @@ struct ConversationListView: View {
                         Button {
                             select(store.startNewConversation())
                         } label: {
-                            Label(L("New chat"), systemImage: "square.and.pencil")
+                            Label(L("New note"), systemImage: "square.and.pencil")
                         }
                         Button(role: .destructive) {
                             showDeleteAllConfirmation = true
@@ -45,7 +45,7 @@ struct ConversationListView: View {
                 }
             }
             .confirmationDialog(
-                L("Delete all chats?"),
+                L("Delete all notes?"),
                 isPresented: $showDeleteAllConfirmation,
                 titleVisibility: .visible
             ) {
