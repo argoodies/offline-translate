@@ -26,6 +26,7 @@ Sources/
     BundledModel.swift    定位 bundle 里的权重文件
     NetworkGate.swift     NWPathMonitor，判断当前是否离线
     Palette.swift         全 app 的黑白灰配色
+    MarkdownStabilizer.swift  把流式中途的半截 Markdown 补成合法的
     SpeechReader.swift    朗读回复，按回复语言选系统语音
     AppSettings.swift     用户设置
   Views/
@@ -63,7 +64,11 @@ open Aero.xcodeproj
 
 **界面锁定浅色外观。** 白底黑字是设定而不是默认值，跟随系统深色会把整套配色反过来，所以在根视图上钉了 `.preferredColorScheme(.light)`。灰阶全部用中性灰而不是系统那套 `systemGray` —— 后者带蓝调，铺在纯白上能看出偏色。用户消息反过来用黑底白字，是界面上唯一的大块深色。
 
-**流式时不渲染 Markdown。** 生成中途的 Markdown 是半截的 —— 没闭合的代码块、写了一半的表格 —— 每 50 毫秒重新解析一次会让界面疯狂闪烁。所以生成时走纯文本，收尾后再交给 MarkdownUI。图片 provider 换成了只读 asset 的版本，堵死它默认的远程图片加载：这个 app 不该有任何出网路径。
+**Markdown 全程渲染，但先补全。** 一开始的做法是生成时走纯文本、收尾后再交给 MarkdownUI —— 结果最后一刻整段重排：标题突然变大、列表缩进、代码块冒出底色。真正的修法是每一帧都渲染 Markdown，同时用 `MarkdownStabilizer` 把半截语法补齐：未闭合的围栏代码块、行内代码、`**`、`~~` 各补上收尾，末行那种刚起头的孤立块级标记（`#`、`-`、`1.`）先藏起来等内容到齐。这样布局从第一个字符起就是最终形态。
+
+代价是每帧都要重建一棵 Markdown 视图树，所以刷新间隔跟着回复长度走（50 / 90 / 140 毫秒）：短回复保持跟手，长回复不至于掉帧。
+
+图片 provider 换成了只读 asset 的版本，堵死 MarkdownUI 默认的远程图片加载 —— 这个 app 不该有任何出网路径。
 
 **模型打包进 app。** 装完就能用 —— 没有等待、没有下载失败、没有「装了 app 却用不了」的中间状态，也不需要任何网络权限。代价是安装包 500 MB 出头，蜂窝网络下 App Store 会多问用户一次。
 

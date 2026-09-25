@@ -314,17 +314,10 @@ private struct MessageBubble: View {
                 .background(bubbleBackground)
                 .foregroundStyle(Palette.bubbleUserText)
                 .clipShape(RoundedRectangle(cornerRadius: 18))
-        } else if isStreaming {
-            // 生成过程中用纯文本：半截的 Markdown（没闭合的代码块、写了一半的表格）
-            // 每 50 毫秒重新解析一次，界面会疯狂闪烁。生成完再渲染。
-            Text(message.text)
-                .textSelection(.enabled)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(bubbleBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
         } else {
-            Markdown(message.text)
+            // 全程走 Markdown，包括生成中途 —— 生成时用纯文本、结束后再渲染的话，
+            // 最后一刻整段会重排一次。半截语法交给 MarkdownStabilizer 补齐。
+            Markdown(MarkdownStabilizer.stabilized(message.text))
                 .markdownTheme(.aero)
                 // 本地模型不会产出图片链接，而且这个 app 不联网 —— 换成只读 asset 的
                 // provider，彻底堵死 MarkdownUI 默认的远程图片加载。

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """生成 App 图标（1024×1024）—— 飞行模式。
 
-视觉参照 iOS 控制中心里飞行模式那颗按钮：系统橙渐变打底，正中一架朝上的白色飞机。
+白底黑飞机，跟 app 内部的配色一致。
 
 注意这架飞机是这里手写的多边形，不是 SF Symbols 的字形。SF Symbols 的许可明确禁止
 把 symbol（以及「实质上或容易混淆地相似」的字形）用作 app icon，所以不能直接搬 —— 飞机
@@ -14,9 +14,11 @@ from PIL import Image, ImageDraw, ImageFilter
 SIZE = 1024
 OUTPUT = "Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png"
 
-# 系统橙的上下两端，深色在下，让图标在浅色壁纸上也压得住。
-TOP = (255, 176, 64)
-BOTTOM = (243, 112, 0)
+# 底色。给一点几乎看不见的渐变，纯平的白在主屏上会显得发死。
+TOP = (255, 255, 255)
+BOTTOM = (244, 244, 246)
+
+PLANE = (0, 0, 0)
 
 # 朝上的飞机轮廓，右半边。坐标归一化到 -1…1，x 向右、y 向上，机头在 (0, 1)。
 # 左半边由镜像生成，保证绝对对称。
@@ -79,8 +81,8 @@ def main():
     polygon = airplane_polygon(center=(canvas / 2, canvas / 2), scale=canvas * 0.36)
     mask = rounded_mask(canvas, polygon, radius=canvas * 0.012)
 
-    white = Image.new("RGB", (canvas, canvas), (255, 255, 255))
-    image = Image.composite(white, image, mask)
+    plane = Image.new("RGB", (canvas, canvas), PLANE)
+    image = Image.composite(plane, image, mask)
 
     image = image.resize((SIZE, SIZE), Image.LANCZOS)
     image.save(OUTPUT)

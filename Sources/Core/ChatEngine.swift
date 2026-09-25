@@ -171,7 +171,9 @@ final class ChatEngine: ObservableObject {
                     buffer += sanitizer.consume(piece)
                     let now = Date()
                     // 逐 token 刷新 @Published 会让 SwiftUI 每秒重绘几十次，按时间片合并。
-                    if now.timeIntervalSince(lastFlush) >= 0.05 {
+                    // 回复越长，一次 Markdown 重建越贵，间隔也就放得越宽 —— 短回复保持跟手，
+                    // 长回复不至于每帧都在重排。
+                    if now.timeIntervalSince(lastFlush) >= Self.flushInterval(forLength: streamingText.count) {
                         if !buffer.isEmpty {
                             streamingText += buffer
                             buffer = ""
@@ -325,6 +327,14 @@ final class ChatEngine: ObservableObject {
         if cancelled {
             // 提前停下时 KV 里的内容和落盘的消息对不上，下轮重建。
             invalidateContext()
+        }
+    }
+
+    private static func flushInterval(forLength length: Int) -> TimeInterval {
+        switch length {
+        case ..<600: return 0.05
+        case ..<2000: return 0.09
+        default: return 0.14
         }
     }
 
