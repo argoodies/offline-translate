@@ -31,7 +31,7 @@ struct NoteView: View {
                 .toolbarBackground(Palette.canvas, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
                 .toolbar { toolbarContent }
-                .safeAreaInset(edge: .top, spacing: 0) { statusBar }
+                .safeAreaInset(edge: .top, spacing: 0) { contextBar }
                 .sheet(isPresented: $showConversations) { ConversationListView() }
         }
         .onChange(of: store.currentID) { _ in
@@ -265,24 +265,6 @@ struct NoteView: View {
 
     // MARK: - 上下文提示
 
-    /// 顶栏那根细线。同一个位置轮流表示两件事，但两件事不会同时发生：
-    /// 加载中画加载进度，之后画上下文余量。
-    @ViewBuilder
-    private var statusBar: some View {
-        if engine.phase == .loadingModel {
-            // 模型还在读。人已经可以写了，这条只是交代后台在忙 ——
-            // 所以是顶上一根细线，而不是一整屏把人挡在外面。
-            LoadingBar(progress: engine.loadProgress)
-                .frame(height: 2)
-                .padding(.horizontal, 22)
-                .padding(.bottom, 8)
-                .background(Palette.canvas)
-                .transition(.opacity)
-        } else {
-            contextBar
-        }
-    }
-
     /// 上下文快满了的提示。原本是一句英文，现在是一根细线 ——
     /// 说的本来就是「还剩多少」这种量，一条渐渐填满的线比一句话更直接，
     /// 也不用挑语言。快满的时候才出现，平时一条常驻进度条只是噪音。
@@ -335,8 +317,7 @@ struct NoteView: View {
     /// 把刚写的那段定下来，让模型从下一行接着写。
     private func commit() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        // 加载中也收 —— ChatEngine 会把这段先落在页面上，就绪了自己开始回答。
-        guard !text.isEmpty, engine.phase == .ready || engine.phase == .loadingModel else { return }
+        guard !text.isEmpty, engine.phase == .ready else { return }
         draft = ""
         speech.stop()
         Haptics.messageSent()

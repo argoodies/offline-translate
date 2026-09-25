@@ -39,7 +39,6 @@ final class ChatEngine: ObservableObject {
     private var currentTask: Task<Void, Never>?
     private var pacer: StreamPacer?
     private var loadedModelPath: String?
-    private var pendingPrompt: Pending?
 
     /// KV cache 当前对应哪个会话 —— cache 里存的是这个会话的历史，换会话必须重置。
     private var contextConversationID: UUID?
@@ -82,7 +81,6 @@ final class ChatEngine: ObservableObject {
             invalidateContext()
             loadProgress = 1
             phase = .ready
-            flushPendingPrompt()
         } catch {
             loadedModelPath = nil
             phase = .loadFailed(error.localizedDescription)
@@ -100,39 +98,10 @@ final class ChatEngine: ObservableObject {
 
     func send(_ text: String, store: ChatStore) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let conversationID = store.currentID else { return }
-        guard phase == .ready || phase == .loadingModel else { return }
+        guard !trimmed.isEmpty, phase == .ready, let conversationID = store.currentID else { return }
 
         store.append(ChatMessage(role: .user, text: trimmed), to: conversationID)
-
-        guard phase == .ready else {
-            // 模型还在读权重。这段先原地落定 —— 让人看着自己刚写完的字凭空消失，
-            // 比等模型难受得多。生成推迟到就绪那一刻自己开始，不用他再点一次。
-            pendingPrompt = Pending(text: trimmed, conversationID: conversationID, store: store)
-            return
-        }
         generate(userMessage: trimmed, conversationID: conversationID, store: store)
-    }
-
-    /// 加载还没完就写完的那一段。
-    private struct Pending {
-        let text: String
-        let conversationID: UUID
-        let store: ChatStore
-    }
-
-    /// 模型就绪了，把攒着的那段发出去。
-    private func flushPendingPrompt() {
-        guard let pending = pendingPrompt else { return }
-        pendingPrompt = nil
-        // 等待期间可能换了笔记。回答是流进当前打开的那一页的，这时候发出去就成了
-        // 张冠李戴 —— 干脆不发。那段字还留在原来那页上，回去收一次笔就是。
-        guard pending.store.currentID == pending.conversationID else { return }
-        generate(
-            userMessage: pending.text,
-            conversationID: pending.conversationID,
-            store: pending.store
-        )
     }
 
     /// 重新生成最后一条回复：撤掉上一轮问答，用同样的问题再问一次。
