@@ -67,19 +67,17 @@ struct NoteView: View {
                         Color.clear.frame(height: 1).id(bottomAnchor)
 
                         // 正文下面留半屏空白。一页纸本来就不会在最后一行戛然而止，
-                        // 而且这块空白是可点的 —— 想接着写，点哪儿都行。
+                        // 而且这块空白是可点的 —— 没在写就落笔，正在写就收笔。
                         // 顺带让短笔记也能滑动，下滑收键盘那条路才始终走得通。
                         Color.clear.frame(height: geometry.size.height * 0.5)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 22)
                     .padding(.top, 20)
+                    .background(tapCatcher)
                 }
                 .background(Palette.canvas)
                 .scrollDismissesKeyboard(.interactively)
-                // 点空白处就开始写 —— 跟备忘录一样，不用去够某个输入框。
-                .contentShape(Rectangle())
-                .onTapGesture { writing = true }
                 // 开始写的时候把下方那半屏留白滑出来，让落笔的位置尽量靠上 ——
                 // 否则光标贴着键盘，能看见的正文只剩一两行。
                 .onChange(of: writing) { isWriting in
@@ -142,6 +140,20 @@ struct NoteView: View {
             // 逐字放行本来就柔和，再把随之而来的换行、重排缓一下，
             // 整体才是"浮出来"而不是"弹出来"。
             .animation(.easeOut(duration: 0.18), value: text)
+    }
+
+    /// 接住落在正文上的点击：没在写就落笔，正在写就收笔。
+    ///
+    /// 它铺在正文底下而不是加在 ScrollView 上。加在 ScrollView 上的话输入框本身
+    /// 也在这个手势的命中范围里，点进输入框想挪一下光标会被当成「点了外面」而收笔。
+    /// 垫在底下，输入框在它前面，点输入框就由输入框自己处理，手势根本收不到。
+    ///
+    /// 正文的 Text 不接手势，点上去会穿透到这一层；正在朗读的那段除外 ——
+    /// 可选中的文本自己带手势，点它不会收笔。剩下的大片留白都算「外面」。
+    private var tapCatcher: some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .onTapGesture { writing.toggle() }
     }
 
     /// 文档末尾那支笔。空文档时它就在左上角，光标落下去就能写。
