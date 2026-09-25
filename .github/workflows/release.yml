@@ -253,9 +253,10 @@ jobs:
           ./scripts/make-install-site.sh "$IPA" "$HOST" "${{ github.run_number }}"
 
           flyctl apps create "$APP" --org personal 2>/dev/null || true
-          flyctl deploy distribution \
-            --config distribution/fly.toml \
-            --remote-only --ha=false
+          # 进目录跑，让 flyctl 自己读同级的 fly.toml。给目录参数的同时再给 --config
+          # 会让它把配置路径当成相对那个目录去解析，最后找的是 distribution/fly.toml/fly.toml。
+          cd distribution
+          flyctl deploy --remote-only --ha=false
 
           echo "::notice::安装页 https://${HOST}"
           echo "### 安装页 https://${HOST}" >> "$GITHUB_STEP_SUMMARY"
