@@ -191,13 +191,9 @@ struct NoteView: View {
                 .transition(.opacity)
             }
         }
-        // 「完成」只负责收起键盘，落笔这件事由 blur 本身触发。
-        // 留着它是因为空文档时没内容可滑，下滑收键盘那条路走不通。
-        ToolbarItemGroup(placement: .keyboard) {
-            Spacer()
-            Button(L("Done")) { writing = false }
-                .font(.body.weight(.semibold))
-        }
+        // 键盘上方不再放「完成」。当初留它是因为空文档没内容可滑、下滑收键盘那条路
+        // 走不通；正文下方补了半屏留白之后，任何长度的笔记都能滑动，它就多余了 ——
+        // 写了东西按右上角的勾，没写东西往下一滑。
     }
 
     /// 两个 SF Symbol 的字形高度和光学重心并不一致，直接摆上去会一高一低；
