@@ -13,7 +13,7 @@
 | 模型 | [Qwen3.5-0.8B](https://huggingface.co/Qwen/Qwen3.5-0.8B) GGUF，Q4_K_M（507 MB），随包安装 | 这个体积档里综合能力最好的一批，支持 201 种语言 |
 | Markdown | [swift-markdown-ui](https://github.com/gonzalezreal/swift-markdown-ui) 2.4 | 系统的 `AttributedString(markdown:)` 不支持代码块和表格 |
 | 朗读 | 系统 `AVSpeechSynthesizer` | 设备上已装的语音包同样离线；长按消息触发 |
-| 配色 | 白底黑字，锁定浅色外观 | 见 `Palette.swift`，只有黑白灰，没有强调色 |
+| 配色 | 黑白灰，跟随系统深浅色 | 见 `Palette.swift`，没有强调色 |
 | 语言 | 全程英语 | 包里没有 `.lproj`，key 即显示文本 |
 | 工程文件 | XcodeGen（`project.yml`） | `.xcodeproj` 不进仓库，避免 pbxproj 的合并地狱 |
 
@@ -26,7 +26,8 @@ Sources/
     Conversation.swift    消息与会话模型，本地 JSON 存储
     BundledModel.swift    定位 bundle 里的权重文件
     NetworkGate.swift     NWPathMonitor，判断当前是否离线
-    Palette.swift         全 app 的黑白灰配色
+    Palette.swift         全 app 的黑白灰配色，跟随深浅色
+    Haptics.swift         触觉反馈
     MarkdownStabilizer.swift  把流式中途的半截 Markdown 补成合法的
     SpeechReader.swift    朗读回复，按回复语言选系统语音
     AppSettings.swift     运行参数，全是常量
@@ -57,6 +58,12 @@ open QW.xcodeproj
 **上下文满了自动裁剪。** 装不下就丢掉最早的一轮问答重建，直到能放下，并在界面上说明「较早的对话已被裁剪」。悄悄丢历史比明说更糟 —— 用户会觉得模型突然失忆。
 
 **不强制离线。** 早先的版本在联网时会挡住对话，逼用户去开飞行模式 —— 判定基于 `NWPathMonitor`，而 iOS 允许 Wi-Fi 独立于飞行模式开着并自动重连，于是「我明明开了飞行模式却进不去」成了常态。那道关卡已经拆掉：app 本来就不发任何网络请求，离线是事实而不需要靠拦人来证明。
+
+**配色跟随系统深浅色。** 整套黑白灰在深色下原样翻过来，用户气泡始终是界面上唯一的大块反色。取色用 `UIColor` 的动态构造而不是两个静态 `Color` —— 系统切换外观时它自己重算，不用在每个视图里读 `colorScheme` 再手动挑一个。灰阶全部用中性灰而不是系统那套 `systemGray`，后者带蓝调，铺在纯白上能看出偏色。app 内的 Logo 是张黑色图，按 template 渲染再染成前景色，否则深色下会糊在黑底上。
+
+**触觉反馈。** 发送时一次 light 敲击；生成时每刷新一段文字敲一下，用 soft —— 它比 light 钝得多，密集触发时不会变成一串刺耳的敲击。强度压到 0.35 并限了 60ms 最小间隔：生成时每秒要刷新十几二十次，照单全收会是一阵持续的嗡嗡声。发生器提前 `prepare()`，否则第一次触发有几十毫秒延迟，正好错过它要标记的那个瞬间。只有 iPhone 有 Taptic Engine，iPad 上这些调用什么也不会发生，但不会出错。
+
+**工具栏两个图标要对齐。** `sidebar.leading` 和 `square.and.pencil` 的字形高度和光学重心并不一致，直接摆上去一高一低；统一字号再塞进等大的方框才横平竖直。
 
 **加载进度来自 llama.cpp 本身。** 半个 GB 的权重 mmap 进来要几秒，静止的画面看着像卡死。`llama_model_params.progress_callback` 会在加载过程中回调 0…1 的进度，接上就行，不用编个假动画。C 回调捕获不了 Swift 闭包，所以把接收方包成一个 class、用 `user_data` 带指针过去，并且 `withExtendedLifetime` 保证它活过整个加载 —— 传的是 unretained 指针。回调每加载一个 tensor 就来一次，几百上千次，所以跨过一个百分点才往外报一次。
 
