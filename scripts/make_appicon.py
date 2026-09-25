@@ -20,8 +20,9 @@ TEXT = "QW"
 FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 # 字宽占画布的比例。字母标横向铺开才够醒目，0.72 之外仍留得下 iOS 圆角要啃掉的边。
 TEXT_WIDTH_RATIO = 0.72
-# 视觉居中：Q 的尾巴挂在基线以下，纯按外框居中会显得整体偏上。
-BASELINE_NUDGE = -0.015
+# 定位参照。Q 的尾巴垂在基线以下，把它算进垂直居中会把字母主体整体顶上去；
+# 用一个没有下伸部、主体高度相同的串（O 和 Q 等高）来量，主体才坐得正。
+VERTICAL_REFERENCE = "OW"
 
 
 def vertical_gradient(size, top, bottom):
@@ -64,10 +65,15 @@ def text_mask(size):
     mask = Image.new("L", (size, size), 0)
     draw = ImageDraw.Draw(mask)
     font = fitted_font(size)
-    # 按字形的实际外框居中，不用 anchor —— 字体自带的行高会把重心带偏。
-    left, top, right, bottom = draw.textbbox((0, 0), TEXT, font=font)
+
+    # 横向按真实墨迹居中，不用 anchor —— 字体自带的行高会把重心带偏。
+    left, _, right, _ = draw.textbbox((0, 0), TEXT, font=font)
     x = (size - (right - left)) / 2 - left
-    y = (size - (bottom - top)) / 2 - top + BASELINE_NUDGE * size
+
+    # 纵向按大写字母主体居中，忽略 Q 垂到基线以下的那截尾巴。
+    _, ref_top, _, ref_bottom = draw.textbbox((0, 0), VERTICAL_REFERENCE, font=font)
+    y = (size - (ref_bottom - ref_top)) / 2 - ref_top
+
     draw.text((x, y), TEXT, font=font, fill=255)
     return mask
 

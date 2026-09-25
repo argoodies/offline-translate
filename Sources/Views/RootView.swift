@@ -36,13 +36,10 @@ struct RootView: View {
         ZStack {
             Palette.canvas.ignoresSafeArea()
             VStack(spacing: 22) {
-                // Logo 是张黑色图，深色模式下得反过来才看得见。
                 Image("Logo")
-                    .renderingMode(.template)
                     .resizable()
                     .scaledToFit()
                     .frame(width: 112, height: 112)
-                    .foregroundStyle(Palette.ink)
 
                 ProgressView(value: engine.loadProgress)
                     .progressViewStyle(.linear)
