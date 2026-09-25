@@ -26,14 +26,15 @@ enum Haptics {
         stream.prepare()
     }
 
-    /// 模型每吐出一段文字敲一下。
+    /// 模型每放出一段文字敲一下。
     ///
-    /// 强度压到很低，并且限了最小间隔：生成时每秒要刷新十几二十次，
-    /// 照单全收会是一阵持续的嗡嗡声，既烦人又费电。
+    /// 节奏由 StreamPacer 决定（约 30 次/秒），这里再限一道 45ms 的下限，
+    /// 让它落在每秒二十次上下 —— 密到能连成一串"正在打字"的手感，
+    /// 又不至于变成一阵分不出颗粒的嗡嗡声。
     static func streamTick() {
         let now = Date()
-        guard now.timeIntervalSince(lastStreamTick) >= 0.06 else { return }
+        guard now.timeIntervalSince(lastStreamTick) >= 0.045 else { return }
         lastStreamTick = now
-        stream.impactOccurred(intensity: 0.35)
+        stream.impactOccurred(intensity: 0.55)
     }
 }

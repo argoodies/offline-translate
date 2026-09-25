@@ -297,7 +297,11 @@ private struct MessageBubble: View {
         } else {
             // 全程走 Markdown，包括生成中途 —— 生成时用纯文本、结束后再渲染的话，
             // 最后一刻整段会重排一次。半截语法交给 MarkdownStabilizer 补齐。
+            //
+            // 文本每次增长都给一点缓动：逐字放行本来就柔和，再把随之而来的
+            // 换行、重排也缓一下，整体才是"浮出来"而不是"弹出来"。
             Markdown(MarkdownStabilizer.stabilized(message.text))
+                .animation(.easeOut(duration: 0.18), value: message.text)
                 .markdownTheme(.qw)
                 // 本地模型不会产出图片链接，而且这个 app 不联网 —— 换成只读 asset 的
                 // provider，彻底堵死 MarkdownUI 默认的远程图片加载。

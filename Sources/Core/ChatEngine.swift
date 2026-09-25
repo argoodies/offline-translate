@@ -37,6 +37,7 @@ final class ChatEngine: ObservableObject {
 
     private let bridge = LlamaBridge()
     private var currentTask: Task<Void, Never>?
+    private var pacer: StreamPacer?
     private var loadedModelPath: String?
 
     /// KV cache 当前对应哪个会话 —— cache 里存的是这个会话的历史，换会话必须重置。
@@ -109,6 +110,9 @@ final class ChatEngine: ObservableObject {
 
     func stop() {
         currentTask?.cancel()
+        // 连队列里还没放出去的也一并丢掉 —— 用户按的是停止，不是"放完再停"。
+        pacer?.cancel()
+        pacer = nil
     }
 
     private func generate(userMessage: String, conversationID: UUID, store: ChatStore) {
@@ -142,8 +146,14 @@ final class ChatEngine: ObservableObject {
         var firstTokenAt: Date?
         var generated = 0
         var truncated = false
-        var buffer = ""
-        var lastFlush = startedAt
+
+        // 模型吐字的节奏很不均匀，直接往界面上灌就是一块一块地跳。
+        // 交给 pacer 摊平成匀速，触觉反馈也跟着它走，才是稳定的节拍。
+        let pacer = StreamPacer(
+            onEmit: { [weak self] chunk in self?.streamingText += chunk },
+            onTick: { Haptics.streamTick() }
+        )
+        self.pacer = pacer
 
         do {
             try await primeContext(
@@ -159,19 +169,7 @@ final class ChatEngine: ObservableObject {
                 case .token(let piece):
                     generated += 1
                     if firstTokenAt == nil, !piece.isEmpty { firstTokenAt = Date() }
-                    buffer += sanitizer.consume(piece)
-                    let now = Date()
-                    // 逐 token 刷新 @Published 会让 SwiftUI 每秒重绘几十次，按时间片合并。
-                    // 回复越长，一次 Markdown 重建越贵，间隔也就放得越宽 —— 短回复保持跟手，
-                    // 长回复不至于每帧都在重排。
-                    if now.timeIntervalSince(lastFlush) >= Self.flushInterval(forLength: streamingText.count) {
-                        if !buffer.isEmpty {
-                            streamingText += buffer
-                            buffer = ""
-                            Haptics.streamTick()
-                        }
-                        lastFlush = now
-                    }
+                    pacer.enqueue(sanitizer.consume(piece))
                 case .endOfGeneration:
                     break loop
                 case .contextFull, .tokenLimit:
@@ -181,9 +179,11 @@ final class ChatEngine: ObservableObject {
             }
 
             let tail = await bridge.drain()
-            buffer += sanitizer.consume(tail)
-            buffer += sanitizer.finish()
-            streamingText += buffer
+            pacer.enqueue(sanitizer.consume(tail))
+            pacer.enqueue(sanitizer.finish())
+            // 等队列见底再收尾，否则最后一段会被下面的整体替换直接吞掉。
+            await pacer.finish()
+            self.pacer = nil
 
             let elapsed = Date().timeIntervalSince(firstTokenAt ?? startedAt)
             stats = Stats(
@@ -200,6 +200,8 @@ final class ChatEngine: ObservableObject {
             )
         } catch {
             // 生成到一半失败也要把已经吐出来的内容留下，不然用户白等。
+            pacer.cancel()
+            self.pacer = nil
             await finish(
                 text: sanitizer.visibleText,
                 truncated: true,
@@ -311,14 +313,6 @@ final class ChatEngine: ObservableObject {
         if cancelled {
             // 提前停下时 KV 里的内容和落盘的消息对不上，下轮重建。
             invalidateContext()
-        }
-    }
-
-    private static func flushInterval(forLength length: Int) -> TimeInterval {
-        switch length {
-        case ..<600: return 0.05
-        case ..<2000: return 0.09
-        default: return 0.14
         }
     }
 
