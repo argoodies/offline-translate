@@ -23,24 +23,27 @@ enum AppSettings {
     /// 默认的 AUTO 只对单个超过 4 GiB 的张量生效，0.8B 里没有那种张量，走的是
     /// 头文件里那条「always read the whole tensor up front」—— 整个文件照样读完。
     ///
-    /// 照这个推论试过 DIRECT_IO。那一版确实加载失败，但同一批改动里还砍了
-    /// contextSize 和 batchSize，而退回 mmap 之后依然失败 —— 所以真正的原因是那两个
-    /// 参数，DIRECT_IO 从头到尾没被单独验证过，既不能说它有问题，也不能说它没问题。
+    /// 照这个推论试过 DIRECT_IO。那几版加载确实会失败，但同一批改动里还砍了
+    /// contextSize 和 batchSize，而后来发现设备当时是烫的 —— 三个可疑项加一个外部
+    /// 条件，谁都没被单独验证过。DIRECT_IO 既不能说有问题，也不能说没问题。
     ///
     /// 留在 mmap 上，因为这是唯一一个确认能用的。要再试 DIRECT_IO 的话单独试，
     /// 而且盯着内存：它读出来的是脏内存，不像 mmap 的页那样能被系统丢掉再读回来。
     static let loadMode = LLAMA_LOAD_MODE_MMAP
     /// 上下文越大越能记住长对话，但 KV cache 会线性吃内存。
     ///
-    /// 试过砍到 2048 省启动时间，结果加载必然在建上下文那一步失败。没查出确切机制 ——
-    /// Qwen3.5 是 Gated DeltaNet 混合架构，循环层和注意力层的缓存规则不一样，
-    /// 多半在某处有对齐或整除的要求。反正 4096 是确认能用的，回到这里。
+    /// 试过砍到 2048 省启动时间，那段时间加载一直在建上下文那一步失败，一度以为是它。
+    /// 后来发现当时手机是烫的 —— 建上下文正好要编 Metal 内核、申请 GPU 缓冲，
+    /// 而 iOS 在热压力下就是会拒绝这类请求。所以 2048 到底有没有问题，没有定论。
+    ///
+    /// 留在 4096 是因为它跑了很久没出过事。想再试 2048 的话，先让设备凉下来。
     static let contextSize = 4096
     static let maxReplyTokens = 512
     /// 单次 decode 提交的最大 token 数，同时也是 `n_ubatch`。
     ///
-    /// 和 contextSize 一起砍过一次（512 → 256），同一次改动把加载弄挂了，
-    /// 所以一并退回。要再试的话一次只动一个 —— 上次两个一起动，挂了也分不清是谁。
+    /// 和 contextSize 一起砍过一次（512 → 256），那批改动之后加载开始失败，
+    /// 于是一并退回 —— 但真凶很可能是设备过热，见上面那段。要再试就一次只动一个，
+    /// 而且在凉机上试：上次一口气动了三个（还有 load_mode），出了事谁也摘不清。
     static let batchSize: UInt32 = 512
     /// 性能核数量；iPhone 上开满所有核反而会被调度器降频，留一个给系统。
     static let threadCount = Int(LlamaBridge.Config.defaultThreadCount)

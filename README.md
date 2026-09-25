@@ -8,13 +8,13 @@
 
 | 层 | 选型 | 为什么 |
 | --- | --- | --- |
-| 界面 | SwiftUI，iOS / iPadOS 16.4+ | 下限由 llama.cpp 的 xcframework 决定 |
+| 界面 | SwiftUI，iOS / iPadOS 18.6+ | 硬约束是 16.4（xcframework 的编译目标），定得更高是主动选的 |
 | 推理 | llama.cpp（Metal 后端） | GGUF 生态成熟，0.8B 在 A 系芯片上够快 |
 | 模型 | [Qwen3.5-0.8B](https://huggingface.co/Qwen/Qwen3.5-0.8B) GGUF，Q4_K_M（507 MB），随包安装 | 这个体积档里综合能力最好的一批，支持 201 种语言 |
 | Markdown | [swift-markdown-ui](https://github.com/gonzalezreal/swift-markdown-ui) 2.4 | 系统的 `AttributedString(markdown:)` 不支持代码块和表格 |
 | 朗读 | 系统 `AVSpeechSynthesizer` | 设备上已装的语音包同样离线；长按消息触发 |
 | 配色 | 黑白灰，跟随系统深浅色 | 见 `Palette.swift`，没有强调色 |
-| 文案 | 界面上没有词 | 唯一的字样是产品名 QW，其余全是图形和数字；详见下文 |
+| 文案 | 正文页几乎没有词 | 只有 QW 和一句 `Start writing`；启动页和失败页有英文，详见下文 |
 | 工程文件 | XcodeGen（`project.yml`） | `.xcodeproj` 不进仓库，避免 pbxproj 的合并地狱 |
 
 ```
@@ -97,7 +97,7 @@ open QW.xcodeproj
 
 **加载进度来自 llama.cpp 本身。** 半个 GB 的权重 mmap 进来要几秒，静止的画面看着像卡死。`llama_model_params.progress_callback` 会在加载过程中回调 0…1 的进度，接上就行，不用编个假动画。C 回调捕获不了 Swift 闭包，所以把接收方包成一个 class、用 `user_data` 带指针过去，并且 `withExtendedLifetime` 保证它活过整个加载 —— 传的是 unretained 指针。回调每加载一个 tensor 就来一次，几百上千次，所以跨过一个百分点才往外报一次。
 
-模型没就绪就不构建对话界面 —— 不是拿遮罩盖住，是 `RootView` 根本不进那个分支。加载失败时整屏是一个惊叹号加一个重试箭头，只有加载成功（或重试成功）才进得去。原先只在输入栏上方挂一条错误文字，人除了杀掉 app 重开没有别的路 —— 而重开多半是同样的结果。
+模型没就绪就不构建对话界面 —— 不是拿遮罩盖住，是 `RootView` 根本不进那个分支。加载失败时整屏写出 llama.cpp 报的原话加一个 Try again，只有加载成功（或重试成功）才进得去。原先只在输入栏上方挂一条错误文字，人除了杀掉 app 重开没有别的路 —— 而重开多半是同样的结果。
 
 这里有个不能省的区分：**模型加载失败**和**单轮生成失败**必须是两个状态。早先它们共用 `.failed`，于是一旦按「没就绪不给进」来卡，生成时随便一个错误都会把人踢出对话界面，还告诉他模型加载失败。现在 `loadFailed` 接管整屏，`failed` 不打断任何东西 —— 模型还在，对话接着来。
 

@@ -9,8 +9,9 @@ name: QW
 options:
   bundleIdPrefix: io.argoodies
   deploymentTarget:
-    # llama.cpp 的 xcframework 自己就是按 16.4 编的，不能再往下调。
-    iOS: "16.4"
+    # 下限的硬约束是 16.4（llama.cpp 的 xcframework 按那个版本编的），这里定得更高
+    # 是主动选的：跑一个 0.8B 模型对内存和散热的要求，本来就不该落在老设备上。
+    iOS: "18.6"
   developmentLanguage: en
   createIntermediateGroups: true
   groupSortPosition: none
