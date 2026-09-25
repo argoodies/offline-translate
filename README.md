@@ -1,6 +1,6 @@
 # QW
 
-完全离线的 iPad AI 助手。Qwen3.5-0.8B 直接跑在设备上，对话不经过任何服务器。
+完全离线的 iOS / iPadOS AI 助手。Qwen3.5-0.8B 直接跑在设备上，对话不经过任何服务器。
 
 模型随 app 一起安装，装完就能用。app 不发出任何网络请求 —— 开着飞行模式也能用。
 
@@ -8,7 +8,7 @@
 
 | 层 | 选型 | 为什么 |
 | --- | --- | --- |
-| 界面 | SwiftUI，iPadOS 16.4+ | 只做 iPad；下限由 llama.cpp 的 xcframework 决定 |
+| 界面 | SwiftUI，iOS / iPadOS 16.4+ | 下限由 llama.cpp 的 xcframework 决定 |
 | 推理 | llama.cpp（Metal 后端） | GGUF 生态成熟，0.8B 在 A 系芯片上够快 |
 | 模型 | [Qwen3.5-0.8B](https://huggingface.co/Qwen/Qwen3.5-0.8B) GGUF，Q4_K_M（507 MB），随包安装 | 这个体积档里综合能力最好的一批，支持 201 种语言 |
 | Markdown | [swift-markdown-ui](https://github.com/gonzalezreal/swift-markdown-ui) 2.4 | 系统的 `AttributedString(markdown:)` 不支持代码块和表格 |
@@ -55,8 +55,6 @@ open QW.xcodeproj
 **多轮对话复用 KV cache。** 每轮只把新增的那段 prompt 喂进去（`LlamaBridge.extend`），而不是重新 decode 整段历史 —— 后者会让第十轮的首字延迟变成第一轮的十倍，而前面所有轮的状态本来就还躺在 cache 里。代价是要小心维护「cache 现在对应哪个会话、到哪一轮」：换会话、重新生成、中途停止都会让 cache 失效，这时才退回完整重建。
 
 **上下文满了自动裁剪。** 装不下就丢掉最早的一轮问答重建，直到能放下，并在界面上说明「较早的对话已被裁剪」。悄悄丢历史比明说更糟 —— 用户会觉得模型突然失忆。
-
-**只做 iPad。** `TARGETED_DEVICE_FAMILY` 是 `2`，iPhone 上装不了。
 
 **不强制离线。** 早先的版本在联网时会挡住对话，逼用户去开飞行模式 —— 判定基于 `NWPathMonitor`，而 iOS 允许 Wi-Fi 独立于飞行模式开着并自动重连，于是「我明明开了飞行模式却进不去」成了常态。那道关卡已经拆掉：app 本来就不发任何网络请求，离线是事实而不需要靠拦人来证明。
 
