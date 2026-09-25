@@ -5,10 +5,13 @@ import Combine
 @MainActor
 final class ChatEngine: ObservableObject {
     enum Phase: Equatable {
-        case needsModel
         case loadingModel
+        /// 模型加载失败。整个 app 都没法用，只能重试。
+        case loadFailed(String)
         case ready
         case generating
+        /// 这一轮生成失败。模型还在，对话可以接着进行 —— 别和 loadFailed 混为一谈，
+        /// 否则一次生成出错就会把人踢出对话界面。
         case failed(String)
     }
 
@@ -73,18 +76,8 @@ final class ChatEngine: ObservableObject {
             phase = .ready
         } catch {
             loadedModelPath = nil
-            phase = .failed(error.localizedDescription)
+            phase = .loadFailed(error.localizedDescription)
         }
-    }
-
-    func unloadModel() async {
-        currentTask?.cancel()
-        currentTask = nil
-        await bridge.unload()
-        loadedModelPath = nil
-        modelDescription = nil
-        invalidateContext()
-        phase = .needsModel
     }
 
     /// 标记 KV cache 不再可信，下次发消息会重建。

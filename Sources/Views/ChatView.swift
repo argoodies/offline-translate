@@ -145,6 +145,17 @@ struct ChatView: View {
 
     private var inputBar: some View {
         VStack(spacing: 0) {
+            // 单轮生成出错：模型还在，对话能接着来，所以只在这里提一句，不接管整屏。
+            if case .failed(let message) = engine.phase {
+                Label(message, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(Palette.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Palette.surfaceSunken)
+            }
+
             Divider()
 
             HStack(alignment: .bottom, spacing: 10) {

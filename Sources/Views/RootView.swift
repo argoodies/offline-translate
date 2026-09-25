@@ -4,22 +4,30 @@ struct RootView: View {
     @EnvironmentObject private var engine: ChatEngine
 
     var body: some View {
-        ZStack {
+        Group {
             if let modelURL = BundledModel.url {
-                ChatView()
+                content(modelURL: modelURL)
                     .task { await engine.loadModel(at: modelURL) }
-
-                // 模型没就绪之前，对话界面没有意义 —— 整屏盖住，别让人对着一个点不动的输入框。
-                if engine.phase == .loadingModel {
-                    loadingScreen.transition(.opacity)
-                } else if case .failed(let message) = engine.phase {
-                    failureScreen(message, modelURL: modelURL).transition(.opacity)
-                }
             } else {
                 missingModel
             }
         }
         .animation(.easeOut(duration: 0.25), value: engine.phase)
+    }
+
+    /// 模型没就绪就不构建对话界面 —— 不是拿遮罩盖住，是根本不存在。
+    /// 只有加载成功（或重试成功）才进得去。
+    @ViewBuilder
+    private func content(modelURL: URL) -> some View {
+        switch engine.phase {
+        case .loadingModel:
+            loadingScreen.transition(.opacity)
+        case .loadFailed(let message):
+            failureScreen(message, modelURL: modelURL).transition(.opacity)
+        case .ready, .generating, .failed:
+            // .failed 是单轮生成出错，模型还在 —— 留在对话里，由输入栏上方提示。
+            ChatView().transition(.opacity)
+        }
     }
 
     /// 首次启动要把半 GB 权重 mmap 起来，得有几秒。
