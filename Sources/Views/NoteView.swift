@@ -38,9 +38,9 @@ struct NoteView: View {
             speech.stop()
             draft = ""
             writing = false
-            focusIfBlank()
+            focusOnArrival()
         }
-        .task { focusIfBlank() }
+        .task { focusOnArrival() }
         // 收笔即落字：键盘一收，刚写的那段就定下来。
         // 切换记事和新建都是先清空 draft 再 blur，所以不会在那两处误提交。
         .onChange(of: writing) { isWriting in
@@ -294,19 +294,22 @@ struct NoteView: View {
         writing && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// 空白的笔记一进来就落笔。
+    /// 进到一页笔记就落笔，不管它是空的还是已经写满了。
     ///
-    /// 新建一条本来就是为了写东西，进来还要再点一下屏幕纯属多余。有内容的笔记不抢
-    /// 焦点 —— 翻回去多半是为了看，不是为了续写，弹起键盘反而挡掉半屏正文。
+    /// 打开一页笔记本来就是为了写东西，进来还要再点一下屏幕纯属多余。一度只在空白
+    /// 笔记上这么做，理由是「翻回旧笔记多半是为了看」—— 但那是替人猜意图，而收键盘
+    /// 的代价远小于每次都要多点一下。不想写的话往下一滑就收了。
+    ///
+    /// 生成中不抢焦点：那时候输入框根本不在视图里，让位给正在写出来的回答。
     ///
     /// 要等一拍再要焦点。这一下多半跟着列表页的收起动画一起发生，而转场当中提焦点
     /// 系统会直接忽略，键盘不会上来。落地之后再要，才要得到。
-    private func focusIfBlank() {
-        guard store.currentMessages.isEmpty, !engine.isGenerating else { return }
+    private func focusOnArrival() {
+        guard !engine.isGenerating else { return }
         Task {
             try? await Task.sleep(for: .milliseconds(400))
-            // 这 400 毫秒里可能已经换到别的笔记，或者模型开始回答了。
-            guard store.currentMessages.isEmpty, !engine.isGenerating else { return }
+            // 这 400 毫秒里模型可能已经开始回答了。
+            guard !engine.isGenerating else { return }
             writing = true
         }
     }
