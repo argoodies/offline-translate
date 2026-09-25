@@ -67,9 +67,16 @@ struct NoteView: View {
                         Color.clear.frame(height: 1).id(bottomAnchor)
 
                         // 正文下面留半屏空白。一页纸本来就不会在最后一行戛然而止，
-                        // 而且这块空白是可点的 —— 没在写就落笔，正在写就收笔。
                         // 顺带让短笔记也能滑动，下滑收键盘那条路才始终走得通。
-                        Color.clear.frame(height: geometry.size.height * 0.5)
+                        //
+                        // 这半屏是全文唯一一处点了会收笔的地方。收笔即提交，是个不可撤销
+                        // 的动作，不该让人一个手滑就触发 —— 上一版整页都能收笔，写着写着
+                        // 碰一下屏幕就发出去了。它在正文下方、光标后面，往那儿点本来就带着
+                        // 「写完了」的意思，位置本身就是意图。
+                        Color.clear
+                            .frame(height: geometry.size.height * 0.5)
+                            .contentShape(Rectangle())
+                            .onTapGesture { writing.toggle() }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 22)
@@ -142,18 +149,22 @@ struct NoteView: View {
             .animation(.easeOut(duration: 0.18), value: text)
     }
 
-    /// 接住落在正文上的点击：没在写就落笔，正在写就收笔。
+    /// 接住落在正文上的点击。只负责落笔，不负责收笔 —— 点在已经写好的段落之间
+    /// 想接着写，光标落下去就行；正在写的时候点这儿什么也不发生。
+    ///
+    /// 收笔只有两个入口：正文下方那半屏留白，和右上角那个勾。收笔会把这段发出去，
+    /// 是个收不回来的动作，入口越少越好。
     ///
     /// 它铺在正文底下而不是加在 ScrollView 上。加在 ScrollView 上的话输入框本身
-    /// 也在这个手势的命中范围里，点进输入框想挪一下光标会被当成「点了外面」而收笔。
+    /// 也在这个手势的命中范围里，点进输入框想挪一下光标也会被它接走。
     /// 垫在底下，输入框在它前面，点输入框就由输入框自己处理，手势根本收不到。
-    ///
-    /// 正文的 Text 不接手势，点上去会穿透到这一层；正在朗读的那段除外 ——
-    /// 可选中的文本自己带手势，点它不会收笔。剩下的大片留白都算「外面」。
     private var tapCatcher: some View {
         Color.clear
             .contentShape(Rectangle())
-            .onTapGesture { writing.toggle() }
+            .onTapGesture {
+                guard !writing else { return }
+                writing = true
+            }
     }
 
     /// 文档末尾那支笔。空文档时它就在左上角，光标落下去就能写。
@@ -183,14 +194,11 @@ struct NoteView: View {
         // 正在写且写了东西时是「保存」—— 它干的也是收笔：blur 一发生，那段就落定。
         ToolbarItem(placement: .navigationBarTrailing) {
             if justSaved {
-                // 落笔的回执。无论是点「保存」还是收键盘落的笔，都先给这个勾，
+                // 落笔的回执。无论是点勾还是点下方留白落的笔，都先给这个勾，
                 // 再让位给「停止」—— 生成其实已经在跑了，只是先把这一下说清楚。
                 // 同一个勾，落笔后转浅：深色是「可以按」，浅色是「已经落下了」。
                 // 两个状态一样深的话，看不出刚才那下到底有没有生效。
-                Image(systemName: "checkmark")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Palette.inkTertiary)
-                    .frame(width: 30, height: 30)
+                toolbarIcon("checkmark.circle", tint: Palette.inkTertiary)
                     .transition(.scale.combined(with: .opacity))
             } else if engine.isGenerating {
                 Button { engine.stop() } label: {
@@ -200,7 +208,7 @@ struct NoteView: View {
                 .transition(.opacity)
             } else if hasDraft {
                 Button { writing = false } label: {
-                    toolbarIcon("checkmark")
+                    toolbarIcon("checkmark.circle")
                 }
                 .accessibilityLabel("Save")
                 .transition(.opacity)
@@ -213,11 +221,15 @@ struct NoteView: View {
 
     /// 两个 SF Symbol 的字形高度和光学重心并不一致，直接摆上去会一高一低；
     /// 统一字号再塞进等大的方框，才对得齐。
-    private func toolbarIcon(_ name: String) -> some View {
+    ///
+    /// 右上角那两个状态用的是 `checkmark.circle` 和 `stop.circle` —— 同一族的
+    /// 描边圆形，字重和视觉直径都是 SF Symbols 调好的。原先保存用的是光秃秃的
+    /// `checkmark`，跟旁边带圆圈的停止摆在同一个位置上轮流出现，一换就跳一下。
+    private func toolbarIcon(_ name: String, tint: Color = Palette.ink) -> some View {
         Image(systemName: name)
             .font(.system(size: 17, weight: .regular))
             // 显式取前景色：AccentColor 是固定的黑，深色模式下会直接糊在黑底上。
-            .foregroundStyle(Palette.ink)
+            .foregroundStyle(tint)
             .frame(width: 30, height: 30)
             .contentShape(Rectangle())
     }
