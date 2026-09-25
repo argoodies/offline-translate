@@ -117,31 +117,47 @@ private struct LoadingBar: View {
             ZStack(alignment: .leading) {
                 Capsule().fill(Palette.ink.opacity(0.13))
 
+                // 空轨道那一段的扫光。这里底色是浅灰，只有压深才看得出来 ——
+                // 提亮的那道光在浅色上等于没画。
+                sweep(Palette.ink.opacity(0.3), band: band, travel: width)
+
                 Capsule()
                     .fill(Palette.ink)
-                    // 已填充的部分至少露一点，否则 0% 时什么都看不见，
-                    // 扫光也就无处可扫。
+                    // 已填充的部分至少露一点，否则 0% 时什么都看不见。
                     .frame(width: max(filled, 4))
                     // 回调按 1% 一跳，直接改宽度是一格一格地蹦；
                     // 缓动之后是滑过去的，也顺带把跳变的间隙填上了。
                     .animation(.easeOut(duration: 0.45), value: progress)
                     .overlay(alignment: .leading) {
-                        LinearGradient(
-                            colors: [.clear, Palette.canvas.opacity(0.5), .clear],
-                            startPoint: .leading, endPoint: .trailing
-                        )
-                        .frame(width: band)
-                        // 扫的是整条的长度而不是已填充的长度 —— 后者会随进度变，
-                        // 动画中途改终点会让光斑忽然跳一下。多出去的部分被裁掉。
-                        .offset(x: sweeping ? width : -band)
+                        // 已填充那一段的扫光。底色是实心黑，反过来要提亮。
+                        sweep(Palette.canvas.opacity(0.5), band: band, travel: width)
                     }
                     .clipShape(Capsule())
             }
+            // 空轨道那道光要裁在整条里，否则会溢到条外面去。
+            .clipShape(Capsule())
         }
         .onAppear {
             withAnimation(.linear(duration: Self.period).repeatForever(autoreverses: false)) {
                 sweeping = true
             }
         }
+    }
+
+    /// 一道扫光。
+    ///
+    /// 整条上画两道：空轨道那段压深，已填充那段提亮。两道用同一个 `travel` 和
+    /// 同一个 `sweeping`，所以位置严丝合缝 —— 看上去是一道光横穿整条，
+    /// 只是越过填充边界时换了个极性。各自被裁在自己那一段里。
+    ///
+    /// 走的是整条的长度而不是已填充的长度：后者随进度变，动画中途改终点会让光斑
+    /// 突然跳一下。多出去的部分裁掉就是了。
+    private func sweep(_ color: Color, band: Double, travel: Double) -> some View {
+        LinearGradient(
+            colors: [.clear, color, .clear],
+            startPoint: .leading, endPoint: .trailing
+        )
+        .frame(width: band)
+        .offset(x: sweeping ? travel : -band)
     }
 }
