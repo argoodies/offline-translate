@@ -162,13 +162,18 @@ struct NoteView: View {
             }
             .accessibilityLabel(L("Notes"))
         }
-        // 新建挪到了列表页那个浮起来的按钮上，这里只在生成时留一个「停止」。
+        // 新建挪到了列表页那个浮起来的按钮上。这里生成时是「停止」，
+        // 正在写且写了东西时是「保存」—— 它干的也是收笔：blur 一发生，那段就落定。
         ToolbarItem(placement: .navigationBarTrailing) {
             if engine.isGenerating {
                 Button { engine.stop() } label: {
                     toolbarIcon("stop.circle")
                 }
                 .accessibilityLabel(L("Stop"))
+            } else if hasDraft {
+                Button(L("Save")) { writing = false }
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Palette.ink)
             }
         }
         // 「完成」只负责收起键盘，落笔这件事由 blur 本身触发。
@@ -231,6 +236,11 @@ struct NoteView: View {
     }
 
     // MARK: - 动作
+
+    /// 正在写，而且确实写了东西。
+    private var hasDraft: Bool {
+        writing && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     /// 把刚写的那段定下来，让模型从下一行接着写。
     private func commit() {
