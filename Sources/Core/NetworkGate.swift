@@ -13,10 +13,8 @@ final class NetworkGate: ObservableObject {
     @Published private(set) var isOffline = false
     /// 第一次回调还没来。启动瞬间状态未知，这时不该急着下判断、闪一下提示页。
     @Published private(set) var hasDetermined = false
-    /// 用户在提示页选择了「仍要继续」。
-    @Published var userBypassed = false
-
-    var allowsChat: Bool { isOffline || userBypassed }
+    /// 离线是进入对话的硬条件，没有例外出口。
+    var allowsChat: Bool { isOffline }
 
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "io.argoodies.aero.networkgate")
@@ -28,9 +26,6 @@ final class NetworkGate: ObservableObject {
                 guard let self else { return }
                 self.isOffline = offline
                 self.hasDetermined = true
-                // 一旦真的断网，之前的「仍要继续」就没有意义了，收回来。
-                // 这样用户下次联网时还会再被拦一次。
-                if offline { self.userBypassed = false }
             }
         }
         monitor.start(queue: queue)

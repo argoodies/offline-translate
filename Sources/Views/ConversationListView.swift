@@ -19,25 +19,25 @@ struct ConversationListView: View {
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
             .background(Palette.canvas)
-            .navigationTitle(String(localized: "对话"))
+            .navigationTitle(L("Chats"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Palette.canvas, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(String(localized: "关闭")) { dismiss() }
+                    Button(L("Close")) { dismiss() }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
                         Button {
                             select(store.startNewConversation())
                         } label: {
-                            Label(String(localized: "新对话"), systemImage: "square.and.pencil")
+                            Label(L("New chat"), systemImage: "square.and.pencil")
                         }
                         Button(role: .destructive) {
                             showDeleteAllConfirmation = true
                         } label: {
-                            Label(String(localized: "删除全部"), systemImage: "trash")
+                            Label(L("Delete all"), systemImage: "trash")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -45,21 +45,21 @@ struct ConversationListView: View {
                 }
             }
             .confirmationDialog(
-                String(localized: "删除全部对话？"),
+                L("Delete all chats?"),
                 isPresented: $showDeleteAllConfirmation,
                 titleVisibility: .visible
             ) {
-                Button(String(localized: "删除全部"), role: .destructive) {
+                Button(L("Delete all"), role: .destructive) {
                     store.deleteAll()
                     engine.invalidateContext()
                 }
             } message: {
-                Text(String(localized: "此操作无法撤销。"))
+                Text(L("This cannot be undone."))
             }
-            .alert(String(localized: "重命名"), isPresented: renameBinding) {
-                TextField(String(localized: "标题"), text: $renameText)
-                Button(String(localized: "取消"), role: .cancel) { renamingID = nil }
-                Button(String(localized: "保存")) {
+            .alert(L("Rename"), isPresented: renameBinding) {
+                TextField(L("Title"), text: $renameText)
+                Button(L("Cancel"), role: .cancel) { renamingID = nil }
+                Button(L("Save")) {
                     if let renamingID { store.rename(renamingID, to: renameText) }
                     renamingID = nil
                 }
@@ -85,7 +85,7 @@ struct ConversationListView: View {
                         Text(conversation.updatedAt, format: .relative(presentation: .named))
                         if !conversation.isEmpty {
                             Text("·")
-                            Text(String(localized: "\(conversation.messages.count) 条消息"))
+                            Text(L("\(conversation.messages.count) messages"))
                         }
                     }
                     .font(.caption2)
@@ -104,13 +104,13 @@ struct ConversationListView: View {
                 store.delete(conversation.id)
                 engine.invalidateContext()
             } label: {
-                Label(String(localized: "删除"), systemImage: "trash")
+                Label(L("Delete"), systemImage: "trash")
             }
             Button {
                 renameText = conversation.customTitle ?? conversation.title
                 renamingID = conversation.id
             } label: {
-                Label(String(localized: "重命名"), systemImage: "pencil")
+                Label(L("Rename"), systemImage: "pencil")
             }
             .tint(Palette.inkSecondary)
         }

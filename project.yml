@@ -11,7 +11,7 @@ options:
   deploymentTarget:
     # llama.cpp 的 xcframework 自己就是按 16.4 编的，不能再往下调。
     iOS: "16.4"
-  developmentLanguage: zh-Hans
+  developmentLanguage: en
   createIntermediateGroups: true
   groupSortPosition: none
 

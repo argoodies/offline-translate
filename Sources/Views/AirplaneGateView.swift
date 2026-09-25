@@ -3,7 +3,7 @@ import SwiftUI
 /// 联网时挡在对话前面的那一页。
 ///
 /// Aero 的主张是「不被打扰」，所以入口就把这件事变成一个动作：去打开飞行模式。
-/// 检测到断网后会自动放行，不需要用户再点什么。
+/// 检测到断网后会自动放行，不需要用户再点什么 —— 也没有别的路可走，这是硬条件。
 struct AirplaneGateView: View {
     @EnvironmentObject private var gate: NetworkGate
     @EnvironmentObject private var engine: ChatEngine
@@ -28,11 +28,11 @@ struct AirplaneGateView: View {
             .animation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true), value: pulsing)
             .onAppear { pulsing = true }
 
-            Text(String(localized: "请打开飞行模式"))
+            Text(L("Turn on Airplane Mode"))
                 .font(.title3.weight(.semibold))
                 .padding(.top, 28)
 
-            Text(String(localized: "Aero 完全离线运行，不需要网络。\n从右上角下拉打开控制中心，点亮飞机图标。"))
+            Text(L("Aero runs entirely offline and needs no network.\nSwipe down from the top-right for Control Center, then tap the airplane."))
                 .font(.subheadline)
                 .foregroundStyle(Palette.inkSecondary)
                 .multilineTextAlignment(.center)
@@ -45,15 +45,7 @@ struct AirplaneGateView: View {
             Spacer()
 
             modelStatus
-                .padding(.bottom, 4)
-
-            // 留个出口。网络状态的判断依赖系统回调，真出现误判时不该把人锁死在启动页。
-            Button(String(localized: "仍要继续")) {
-                gate.userBypassed = true
-            }
-            .font(.footnote)
-            .foregroundStyle(Palette.inkTertiary)
-            .padding(.bottom, 28)
+                .padding(.bottom, 32)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Palette.canvas)
@@ -65,14 +57,14 @@ struct AirplaneGateView: View {
         if engine.phase == .loadingModel {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.mini)
-                Text(String(localized: "正在加载模型…"))
+                Text(L("Loading model…"))
             }
             .font(.caption2)
             .foregroundStyle(Palette.inkTertiary)
         } else if engine.phase == .ready {
             HStack(spacing: 5) {
                 Image(systemName: "checkmark.circle.fill")
-                Text(String(localized: "模型已就绪"))
+                Text(L("Model ready"))
             }
             .font(.caption2)
             .foregroundStyle(Palette.inkTertiary)
@@ -86,8 +78,8 @@ struct AirplaneGateView: View {
                 .background(Circle().fill(gate.isOffline ? Palette.ink : Color.clear))
                 .frame(width: 9, height: 9)
             Text(gate.isOffline
-                 ? String(localized: "已离线")
-                 : String(localized: "检测到网络连接"))
+                 ? L("Offline")
+                 : L("Network connection detected"))
                 .font(.footnote)
                 .foregroundStyle(Palette.inkSecondary)
         }

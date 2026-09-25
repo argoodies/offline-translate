@@ -22,7 +22,7 @@ struct ChatView: View {
                 messageList
                 inputBar
             }
-            .navigationTitle(store.current?.title ?? String(localized: "新对话"))
+            .navigationTitle(store.current?.title ?? L("New chat"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Palette.canvas, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -33,7 +33,7 @@ struct ChatView: View {
                     } label: {
                         Image(systemName: "list.bullet")
                     }
-                    .accessibilityLabel(String(localized: "对话列表"))
+                    .accessibilityLabel(L("Chat list"))
                 }
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button {
@@ -41,7 +41,7 @@ struct ChatView: View {
                     } label: {
                         Image(systemName: "square.and.pencil")
                     }
-                    .accessibilityLabel(String(localized: "新对话"))
+                    .accessibilityLabel(L("New chat"))
                     .disabled(engine.isGenerating)
 
                     Button {
@@ -49,7 +49,7 @@ struct ChatView: View {
                     } label: {
                         Image(systemName: "gearshape")
                     }
-                    .accessibilityLabel(String(localized: "设置"))
+                    .accessibilityLabel(L("Settings"))
                 }
             }
             .safeAreaInset(edge: .top, spacing: 0) {
@@ -78,8 +78,8 @@ struct ChatView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.circle")
                     Text(engine.didTrimHistory
-                         ? String(localized: "上下文已满，较早的对话已被裁剪")
-                         : String(localized: "上下文快满了，可以开一个新对话"))
+                         ? L("Context was full; earlier messages were dropped")
+                         : L("Context is nearly full — consider starting a new chat"))
                     Spacer()
                 }
                 .font(.caption2)
@@ -156,9 +156,9 @@ struct ChatView: View {
             Image(systemName: "airplane")
                 .font(.system(size: 40, weight: .light))
                 .foregroundStyle(Palette.ink)
-            Text(String(localized: "全程离线"))
+            Text(L("Entirely offline"))
                 .font(.headline)
-            Text(String(localized: "模型跑在这台设备上，对话不会离开你的手机。"))
+            Text(L("The model runs on this device. Nothing you say leaves your phone."))
                 .font(.subheadline)
                 .foregroundStyle(Palette.inkSecondary)
                 .multilineTextAlignment(.center)
@@ -185,7 +185,7 @@ struct ChatView: View {
             Divider()
 
             HStack(alignment: .bottom, spacing: 10) {
-                TextField(String(localized: "发消息…"), text: $draft, axis: .vertical)
+                TextField(L("Message…"), text: $draft, axis: .vertical)
                     .focused($inputFocused)
                     .lineLimit(1...5)
                     .padding(.horizontal, 14)
@@ -200,7 +200,7 @@ struct ChatView: View {
                             .font(.system(size: 30))
                             .symbolRenderingMode(.hierarchical)
                     }
-                    .accessibilityLabel(String(localized: "停止"))
+                    .accessibilityLabel(L("Stop"))
                 } else {
                     Button {
                         send()
@@ -209,7 +209,7 @@ struct ChatView: View {
                             .font(.system(size: 30))
                     }
                     .disabled(!canSend)
-                    .accessibilityLabel(String(localized: "发送"))
+                    .accessibilityLabel(L("Send"))
                 }
             }
             .padding(.horizontal, 12)
@@ -270,7 +270,7 @@ private struct MessageBubble: View {
                 }
 
                 if message.isTruncated {
-                    Label(String(localized: "回复因长度上限被截断"), systemImage: "scissors")
+                    Label(L("Reply cut off at the length limit"), systemImage: "scissors")
                         .font(.caption2)
                         .foregroundStyle(Palette.inkTertiary)
                 }
@@ -283,17 +283,17 @@ private struct MessageBubble: View {
                         speech.toggle(messageID: message.id, text: message.text)
                     } label: {
                         Label(
-                            isSpeaking ? String(localized: "停止朗读") : String(localized: "朗读"),
+                            isSpeaking ? L("Stop reading") : L("Read aloud"),
                             systemImage: isSpeaking ? "stop.circle" : "speaker.wave.2"
                         )
                     }
                     Button {
                         UIPasteboard.general.string = message.text
                     } label: {
-                        Label(String(localized: "复制"), systemImage: "doc.on.doc")
+                        Label(L("Copy"), systemImage: "doc.on.doc")
                     }
                     ShareLink(item: message.text) {
-                        Label(String(localized: "分享"), systemImage: "square.and.arrow.up")
+                        Label(L("Share"), systemImage: "square.and.arrow.up")
                     }
                 }
             }
@@ -343,7 +343,7 @@ private struct MessageBubble: View {
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "brain")
-                    Text(String(localized: "思考过程"))
+                    Text(L("Reasoning"))
                     Image(systemName: showReasoning ? "chevron.up" : "chevron.down")
                         .font(.caption2)
                 }

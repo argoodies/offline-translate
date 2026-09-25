@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>zh-Hans</string>
+	<string>en</string>
 	<key>CFBundleDisplayName</key>
 	<string>Aero</string>
 	<key>CFBundleExecutable</key>
@@ -22,8 +22,9 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>CFBundleLocalizations</key>
 	<array>
-		<string>zh-Hans</string>
 		<string>en</string>
+		<string>zh-Hans</string>
+		<string>ja</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>

@@ -27,7 +27,7 @@ struct Conversation: Identifiable, Codable, Hashable {
     var title: String {
         if let customTitle, !customTitle.isEmpty { return customTitle }
         guard let first = messages.first(where: { $0.role == .user })?.text else {
-            return String(localized: "新对话")
+            return L("New chat")
         }
         let line = first
             .trimmingCharacters(in: .whitespacesAndNewlines)

@@ -1,0 +1,83 @@
+/* 日本語。key は英語の原文。
+   書式指定子付きの key は String(localized:) が生成するものと一致させること：
+   Int → %lld、Int32 → %d、String → %@。 */
+
+/* 界面 */
+"Interface" = "インターフェース";
+"Language" = "言語";
+"Match device" = "デバイスに合わせる";
+
+/* 通用 */
+"Settings" = "設定";
+"Cancel" = "キャンセル";
+"Delete" = "削除";
+"Save" = "保存";
+"Close" = "閉じる";
+"Done" = "完了";
+"Stop" = "停止";
+"Send" = "送信";
+"Copy" = "コピー";
+"Share" = "共有";
+"Read aloud" = "読み上げる";
+"Stop reading" = "読み上げを停止";
+"Rename" = "名前を変更";
+"Title" = "タイトル";
+"This cannot be undone." = "この操作は取り消せません。";
+
+/* 飞行模式关卡 */
+"Turn on Airplane Mode" = "機内モードをオンにしてください";
+"Aero runs entirely offline and needs no network.\nSwipe down from the top-right for Control Center, then tap the airplane." = "Aero は完全にオフラインで動作し、ネットワークを必要としません。\n画面右上から下にスワイプしてコントロールセンターを開き、飛行機のアイコンをタップしてください。";
+"Offline" = "オフライン";
+"Network connection detected" = "ネットワーク接続を検出しました";
+"Model ready" = "モデルの準備完了";
+
+/* 启动 */
+"Loading model…" = "モデルを読み込んでいます…";
+"The model file is missing" = "モデルファイルが見つかりません";
+"This build is incomplete. Please reinstall." = "このビルドは不完全です。再インストールしてください。";
+
+/* 对话 */
+"Chats" = "チャット";
+"New chat" = "新しいチャット";
+"Chat list" = "チャット一覧";
+"Message…" = "メッセージを入力…";
+"Delete all" = "すべて削除";
+"Delete all chats?" = "すべてのチャットを削除しますか？";
+"%lld messages" = "%lld 件のメッセージ";
+"Entirely offline" = "完全オフライン";
+"The model runs on this device. Nothing you say leaves your phone." = "モデルはこの端末で動作します。入力した内容が端末の外に出ることはありません。";
+"Reasoning" = "思考プロセス";
+"Reply cut off at the length limit" = "文字数の上限で回答が途切れました";
+"Context is nearly full — consider starting a new chat" = "コンテキストがもうすぐ一杯です。新しいチャットを始めることをおすすめします";
+"Context was full; earlier messages were dropped" = "コンテキストが一杯になり、古いメッセージが削除されました";
+
+/* 设置页 */
+"System prompt" = "システムプロンプト";
+"Reset to default" = "デフォルトに戻す";
+"Show reasoning" = "思考プロセスを表示";
+"With reasoning shown, the model thinks before answering — slower, but usually better on hard questions. With it off, it answers directly. Takes effect on your next message.\n\nLong-press any message to have it read aloud — system voices, also fully offline." = "「思考プロセスを表示」をオンにすると、モデルは回答する前に推論します。遅くなりますが、難しい質問では精度が上がることが多いです。オフのときは推論を省いて直接回答します。変更は次のメッセージから反映されます。\n\nメッセージを長押しすると読み上げられます。システムの音声を使うため、こちらもオフラインで動作します。";
+"Model" = "モデル";
+"Precision" = "精度";
+"Size on disk" = "ディスク使用量";
+"Architecture" = "アーキテクチャ";
+"The model ships with the app — nothing to download." = "モデルはアプリに同梱されています。ダウンロードは不要です。";
+"Performance" = "パフォーマンス";
+"Context length" = "コンテキスト長";
+"Max reply length" = "回答の最大長";
+"Threads: %lld" = "スレッド数：%lld";
+"Randomness: %.2f" = "ランダム性：%.2f";
+"A longer context remembers more of the conversation but uses more memory, which can get the app killed on older devices. Lower randomness gives steadier answers, higher is more varied. Changes reload the model." = "コンテキストが長いほど前の会話を覚えていられますが、メモリ使用量が増え、古い端末ではシステムにアプリを終了されることがあります。ランダム性が低いほど回答は安定し、高いほど多様になります。変更するとモデルを読み込み直します。";
+"About" = "このアプリについて";
+"Version" = "バージョン";
+"Model page" = "モデルのページ";
+"Inference engine" = "推論エンジン";
+"All chat happens on-device. This app makes no network requests at all." = "すべての対話はこの端末で完結します。このアプリはネットワーク通信を一切行いません。";
+
+/* 错误 */
+"The model is not loaded yet." = "モデルがまだ読み込まれていません。";
+"Could not load %@. The install may be damaged — please reinstall." = "%@ を読み込めませんでした。インストールが破損している可能性があります。再インストールしてください。";
+"Failed to create the inference context. The device may be low on memory." = "推論コンテキストの作成に失敗しました。メモリが不足している可能性があります。";
+"Tokenization failed." = "トークン化に失敗しました。";
+"Inference failed (code %d)." = "推論に失敗しました（コード %d）。";
+"The context is full. Please start a new chat." = "コンテキストが一杯です。新しいチャットを始めてください。";
+"This conversation is too long (%lld tokens, limit %lld). Please start a new chat." = "この会話は長すぎます（%lld トークン、上限 %lld）。新しいチャットを始めてください。";

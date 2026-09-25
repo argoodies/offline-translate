@@ -14,6 +14,7 @@
 | Markdown | [swift-markdown-ui](https://github.com/gonzalezreal/swift-markdown-ui) 2.4 | 系统的 `AttributedString(markdown:)` 不支持代码块和表格 |
 | 朗读 | 系统 `AVSpeechSynthesizer` | 设备上已装的语音包同样离线；长按消息触发 |
 | 配色 | 白底黑字，锁定浅色外观 | 见 `Palette.swift`，只有黑白灰，没有强调色 |
+| 语言 | 英文为基准，另有简体中文和日文，app 内可切 | 见 `Localization.swift` |
 | 工程文件 | XcodeGen（`project.yml`） | `.xcodeproj` 不进仓库，避免 pbxproj 的合并地狱 |
 
 ```
@@ -26,6 +27,7 @@ Sources/
     BundledModel.swift    定位 bundle 里的权重文件
     NetworkGate.swift     NWPathMonitor，判断当前是否离线
     Palette.swift         全 app 的黑白灰配色
+    Localization.swift    界面语言：L(_:) 与 app 内语言切换
     MarkdownStabilizer.swift  把流式中途的半截 Markdown 补成合法的
     SpeechReader.swift    朗读回复，按回复语言选系统语音
     AppSettings.swift     用户设置
@@ -58,7 +60,13 @@ open Aero.xcodeproj
 
 **联网时不让进对话。** Aero 的主张是不被打扰，所以入口直接把这件事变成一个动作：去打开飞行模式，检测到断网自动放行。
 
-需要说清楚的是，iOS **没有公开 API 能查「飞行模式是否开启」**，能查的只有网络可达性（`NWPathMonitor`）。开了飞行模式必然无网，但反过来不成立 —— 关掉 Wi-Fi 和蜂窝也算。对这个 app 来说效果等价，文案按飞行模式写。这一页还留了个「仍要继续」的出口：状态判断依赖系统回调，真出现误判时不该把人锁死在启动页。
+需要说清楚的是，iOS **没有公开 API 能查「飞行模式是否开启」**，能查的只有网络可达性（`NWPathMonitor`）。开了飞行模式必然无网，但反过来不成立 —— 关掉 Wi-Fi 和蜂窝也算。对这个 app 来说效果等价，文案按飞行模式写。
+
+这是硬条件，没有跳过入口。
+
+**界面语言在 app 内切，不跟系统走。** iOS 自带的 per-app 语言设置藏在系统设置里，要跳出 app 才能改。这里所有文案都经过 `L(_:)`，它从 `Localization.bundle` 取字符串而不是锁死的 `Bundle.main` —— 换语言只要换掉这一个入口。切换后给根视图换 `id` 强制重建整棵树，比给每处文案挂观察者干净。
+
+英文是基准语言：代码里的 key 就是英文原文，`zh-Hans` 和 `ja` 提供翻译。`en.lproj` 是一份恒等映射 —— 没有它，在中文设备上选「English」会回落到 `Bundle.main`，又被系统语言带回去。
 
 **App 图标是自己画的飞机，不是 SF Symbol。** Apple 的 SF Symbols 许可禁止把 symbol（以及「实质上或容易混淆地相似」的字形）用作 app icon，并保留要求整改的权利。飞机剪影本身是通用符号，所以 `scripts/make_appicon.py` 用多边形画了一个：先在 4 倍画布上填充，再靠「高斯模糊 + 阈值」把尖角统一磨圆 —— 比在每个顶点手工插贝塞尔控制点省事得多。
 

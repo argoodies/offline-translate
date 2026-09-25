@@ -3,11 +3,13 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var engine: ChatEngine
+    @EnvironmentObject private var language: LanguageSettings
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             Form {
+                interfaceSection
                 behaviourSection
                 modelSection
                 performanceSection
@@ -15,104 +17,119 @@ struct SettingsView: View {
             }
             .scrollContentBackground(.hidden)
             .background(Palette.canvas)
-            .navigationTitle(String(localized: "设置"))
+            .navigationTitle(L("Settings"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Palette.canvas, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(String(localized: "完成")) { dismiss() }
+                    Button(L("Done")) { dismiss() }
                 }
             }
+        }
+    }
+
+    private var interfaceSection: some View {
+        Section {
+            Picker(L("Language"), selection: Binding(
+                get: { language.current },
+                set: { language.select($0) }
+            )) {
+                ForEach(AppLanguage.allCases) { option in
+                    Text(option.displayName).tag(option)
+                }
+            }
+        } header: {
+            Text(L("Interface"))
         }
     }
 
     private var behaviourSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
-                Text(String(localized: "系统提示词"))
+                Text(L("System prompt"))
                     .font(.subheadline)
                 TextEditor(text: $settings.systemPrompt)
                     .frame(minHeight: 90)
                     .font(.footnote)
-                Button(String(localized: "恢复默认")) {
+                Button(L("Reset to default")) {
                     settings.resetSystemPrompt()
                 }
                 .font(.caption)
             }
             .padding(.vertical, 4)
 
-            Toggle(String(localized: "显示思考过程"), isOn: $settings.showReasoning)
+            Toggle(L("Show reasoning"), isOn: $settings.showReasoning)
         } header: {
-            Text(String(localized: "对话"))
+            Text(L("Chats"))
         } footer: {
-            Text(String(localized: "开启「显示思考过程」后，模型会先推理再作答 —— 更慢，但复杂问题上通常更准。关闭时它会跳过推理直接回答。改动在下一条消息生效。\n\n长按任意一条消息可以朗读，用的是系统语音，同样不联网。"))
+            Text(L("With reasoning shown, the model thinks before answering — slower, but usually better on hard questions. With it off, it answers directly. Takes effect on your next message.\n\nLong-press any message to have it read aloud — system voices, also fully offline."))
         }
     }
 
     private var modelSection: some View {
         Section {
-            LabeledContent(String(localized: "模型"), value: BundledModel.displayName)
-            LabeledContent(String(localized: "精度"), value: BundledModel.quantization)
+            LabeledContent(L("Model"), value: BundledModel.displayName)
+            LabeledContent(L("Precision"), value: BundledModel.quantization)
             if let size = BundledModel.formattedSize {
-                LabeledContent(String(localized: "占用空间"), value: size)
+                LabeledContent(L("Size on disk"), value: size)
             }
             if let description = engine.modelDescription {
-                LabeledContent(String(localized: "架构"), value: description)
+                LabeledContent(L("Architecture"), value: description)
                     .font(.footnote)
             }
         } header: {
-            Text(String(localized: "模型"))
+            Text(L("Model"))
         } footer: {
-            Text(String(localized: "模型随 app 一起安装，无需下载。"))
+            Text(L("The model ships with the app — nothing to download."))
         }
     }
 
     private var performanceSection: some View {
         Section {
-            Picker(String(localized: "上下文长度"), selection: $settings.contextSize) {
+            Picker(L("Context length"), selection: $settings.contextSize) {
                 ForEach(AppSettings.contextSizeOptions, id: \.self) { size in
                     Text("\(size)").tag(size)
                 }
             }
 
-            Picker(String(localized: "单条回复上限"), selection: $settings.maxReplyTokens) {
+            Picker(L("Max reply length"), selection: $settings.maxReplyTokens) {
                 ForEach(AppSettings.replyLengthOptions, id: \.self) { size in
                     Text("\(size)").tag(size)
                 }
             }
 
             Stepper(
-                String(localized: "线程数：\(settings.threadCount)"),
+                L("Threads: \(settings.threadCount)"),
                 value: $settings.threadCount,
                 in: 1...AppSettings.maxThreadCount
             )
 
             VStack(alignment: .leading) {
-                Text(String(format: NSLocalizedString("随机度：%.2f", comment: ""), settings.temperature))
+                Text(String(format: L("Randomness: %.2f"), settings.temperature))
                     .font(.subheadline)
                 Slider(value: $settings.temperature, in: 0.05...1.2, step: 0.05)
             }
         } header: {
-            Text(String(localized: "性能"))
+            Text(L("Performance"))
         } footer: {
-            Text(String(localized: "上下文越长越能记住前面的对话，但会占用更多内存，在旧机型上可能导致 app 被系统结束。随机度越低回答越稳定、越高越发散。改动会重新加载模型。"))
+            Text(L("A longer context remembers more of the conversation but uses more memory, which can get the app killed on older devices. Lower randomness gives steadier answers, higher is more varied. Changes reload the model."))
         }
     }
 
     private var aboutSection: some View {
         Section {
-            LabeledContent(String(localized: "版本"), value: Self.appVersion)
+            LabeledContent(L("Version"), value: Self.appVersion)
             Link(destination: URL(string: "https://huggingface.co/Qwen/Qwen3.5-0.8B")!) {
-                LabeledContent(String(localized: "模型主页"), value: "Qwen3.5-0.8B")
+                LabeledContent(L("Model page"), value: "Qwen3.5-0.8B")
             }
             Link(destination: URL(string: "https://github.com/ggml-org/llama.cpp")!) {
-                LabeledContent(String(localized: "推理引擎"), value: "llama.cpp")
+                LabeledContent(L("Inference engine"), value: "llama.cpp")
             }
         } header: {
-            Text(String(localized: "关于"))
+            Text(L("About"))
         } footer: {
-            Text(String(localized: "所有对话都在本机完成。这个 app 不会发起任何网络请求。"))
+            Text(L("All chat happens on-device. This app makes no network requests at all."))
         }
     }
 

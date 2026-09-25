@@ -39,7 +39,7 @@ struct RootView: View {
                 Image(systemName: "airplane")
                     .font(.system(size: 48, weight: .light))
                     .foregroundStyle(Palette.ink)
-                Text(String(localized: "正在加载模型…"))
+                Text(L("Loading model…"))
                     .font(.subheadline)
                     .foregroundStyle(Palette.inkSecondary)
             }
@@ -52,9 +52,9 @@ struct RootView: View {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 40, weight: .light))
                 .foregroundStyle(Palette.inkSecondary)
-            Text(String(localized: "安装包里缺少模型文件"))
+            Text(L("The model file is missing"))
                 .font(.headline)
-            Text(String(localized: "这个构建不完整，请重新安装。"))
+            Text(L("This build is incomplete. Please reinstall."))
                 .font(.subheadline)
                 .foregroundStyle(Palette.inkSecondary)
         }

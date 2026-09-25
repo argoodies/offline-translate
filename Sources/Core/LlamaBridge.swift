@@ -331,19 +331,19 @@ enum LlamaError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notLoaded:
-            return String(localized: "模型尚未加载。")
+            return L("The model is not loaded yet.")
         case .modelLoadFailed(let name):
-            return String(localized: "无法加载模型 \(name)，安装包可能已损坏，请重新安装。")
+            return L("Could not load \(name). The install may be damaged — please reinstall.")
         case .contextCreationFailed:
-            return String(localized: "创建推理上下文失败，可用内存可能不足。")
+            return L("Failed to create the inference context. The device may be low on memory.")
         case .tokenizationFailed:
-            return String(localized: "分词失败。")
+            return L("Tokenization failed.")
         case .decodeFailed(let code):
-            return String(localized: "推理失败（错误码 \(code)）。")
+            return L("Inference failed (code \(code)).")
         case .contextExhausted:
-            return String(localized: "上下文已用尽，请开一个新对话。")
+            return L("The context is full. Please start a new chat.")
         case .promptTooLong(let promptTokens, let contextSize):
-            return String(localized: "这段对话太长了（\(promptTokens) token，上限 \(contextSize)），请开一个新对话。")
+            return L("This conversation is too long (\(promptTokens) tokens, limit \(contextSize)). Please start a new chat.")
         }
     }
 }
