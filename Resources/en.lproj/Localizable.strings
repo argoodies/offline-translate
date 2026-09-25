@@ -30,6 +30,9 @@
 "Offline" = "Offline";
 "Network connection detected" = "Network connection detected";
 "Model ready" = "Model ready";
+"Wi-Fi is still connected" = "Wi-Fi is still connected";
+"Cellular is still connected" = "Cellular is still connected";
+"Airplane Mode doesn't always switch Wi-Fi off — turn it off as well." = "Airplane Mode doesn't always switch Wi-Fi off — turn it off as well.";
 
 /* 启动 */
 "Loading model…" = "Loading model…";

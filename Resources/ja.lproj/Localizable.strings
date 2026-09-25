@@ -30,6 +30,9 @@
 "Offline" = "オフライン";
 "Network connection detected" = "ネットワーク接続を検出しました";
 "Model ready" = "モデルの準備完了";
+"Wi-Fi is still connected" = "Wi-Fi がまだ接続されています";
+"Cellular is still connected" = "モバイル通信がまだ接続されています";
+"Airplane Mode doesn't always switch Wi-Fi off — turn it off as well." = "機内モードにしても Wi-Fi はオフにならないことがあります。あわせてオフにしてください。";
 
 /* 启动 */
 "Loading model…" = "モデルを読み込んでいます…";

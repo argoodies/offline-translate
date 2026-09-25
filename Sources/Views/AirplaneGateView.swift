@@ -39,6 +39,15 @@ struct AirplaneGateView: View {
                 .padding(.top, 10)
                 .padding(.horizontal, 36)
 
+            if gate.link == .wifi {
+                Text(L("Airplane Mode doesn't always switch Wi-Fi off — turn it off as well."))
+                    .font(.footnote)
+                    .foregroundStyle(Palette.ink)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 14)
+                    .padding(.horizontal, 32)
+            }
+
             statusPill
                 .padding(.top, 28)
 
@@ -71,15 +80,22 @@ struct AirplaneGateView: View {
         }
     }
 
+    private var statusLabel: String {
+        switch gate.link {
+        case .none: return L("Offline")
+        case .wifi: return L("Wi-Fi is still connected")
+        case .cellular: return L("Cellular is still connected")
+        case .wired: return L("Network connection detected")
+        }
+    }
+
     private var statusPill: some View {
         HStack(spacing: 8) {
             Circle()
                 .strokeBorder(Palette.ink, lineWidth: 1.5)
                 .background(Circle().fill(gate.isOffline ? Palette.ink : Color.clear))
                 .frame(width: 9, height: 9)
-            Text(gate.isOffline
-                 ? L("Offline")
-                 : L("Network connection detected"))
+            Text(statusLabel)
                 .font(.footnote)
                 .foregroundStyle(Palette.inkSecondary)
         }

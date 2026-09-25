@@ -29,6 +29,9 @@
 "Offline" = "已离线";
 "Network connection detected" = "检测到网络连接";
 "Model ready" = "模型已就绪";
+"Wi-Fi is still connected" = "Wi-Fi 仍然连着";
+"Cellular is still connected" = "蜂窝网络仍然连着";
+"Airplane Mode doesn't always switch Wi-Fi off — turn it off as well." = "开飞行模式不一定会关掉 Wi-Fi，请一并关闭。";
 
 /* 启动 */
 "Loading model…" = "正在加载模型…";
