@@ -38,7 +38,9 @@ struct NoteView: View {
             speech.stop()
             draft = ""
             writing = false
+            focusIfBlank()
         }
+        .task { focusIfBlank() }
         // 收笔即落字：键盘一收，刚写的那段就定下来。
         // 切换记事和新建都是先清空 draft 再 blur，所以不会在那两处误提交。
         .onChange(of: writing) { isWriting in
@@ -290,6 +292,23 @@ struct NoteView: View {
     /// 正在写，而且确实写了东西。
     private var hasDraft: Bool {
         writing && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// 空白的笔记一进来就落笔。
+    ///
+    /// 新建一条本来就是为了写东西，进来还要再点一下屏幕纯属多余。有内容的笔记不抢
+    /// 焦点 —— 翻回去多半是为了看，不是为了续写，弹起键盘反而挡掉半屏正文。
+    ///
+    /// 要等一拍再要焦点。这一下多半跟着列表页的收起动画一起发生，而转场当中提焦点
+    /// 系统会直接忽略，键盘不会上来。落地之后再要，才要得到。
+    private func focusIfBlank() {
+        guard store.currentMessages.isEmpty, !engine.isGenerating else { return }
+        Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            // 这 400 毫秒里可能已经换到别的笔记，或者模型开始回答了。
+            guard store.currentMessages.isEmpty, !engine.isGenerating else { return }
+            writing = true
+        }
     }
 
     /// 把刚写的那段定下来，让模型从下一行接着写。
