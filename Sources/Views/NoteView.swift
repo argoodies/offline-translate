@@ -17,6 +17,8 @@ struct NoteView: View {
     @State private var draft = ""
     @State private var showConversations = false
     @FocusState private var writing: Bool
+    /// 刚落笔。右上角先给个勾作为确认，再让位给生成中的「停止」。
+    @State private var justSaved = false
 
     private let bottomAnchor = "bottom"
     private let composerAnchor = "composer"
@@ -165,15 +167,25 @@ struct NoteView: View {
         // 新建挪到了列表页那个浮起来的按钮上。这里生成时是「停止」，
         // 正在写且写了东西时是「保存」—— 它干的也是收笔：blur 一发生，那段就落定。
         ToolbarItem(placement: .navigationBarTrailing) {
-            if engine.isGenerating {
+            if justSaved {
+                // 落笔的回执。无论是点「保存」还是收键盘落的笔，都先给这个勾，
+                // 再让位给「停止」—— 生成其实已经在跑了，只是先把这一下说清楚。
+                Image(systemName: "checkmark")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Palette.ink)
+                    .frame(width: 30, height: 30)
+                    .transition(.scale.combined(with: .opacity))
+            } else if engine.isGenerating {
                 Button { engine.stop() } label: {
                     toolbarIcon("stop.circle")
                 }
                 .accessibilityLabel(L("Stop"))
+                .transition(.opacity)
             } else if hasDraft {
                 Button(L("Save")) { writing = false }
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Palette.ink)
+                    .transition(.opacity)
             }
         }
         // 「完成」只负责收起键盘，落笔这件事由 blur 本身触发。
@@ -250,6 +262,13 @@ struct NoteView: View {
         speech.stop()
         Haptics.messageSent()
         engine.send(text, store: store)
+
+        // 勾只停留一下。生成同时已经开始，所以这不是等待，只是一句回执。
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { justSaved = true }
+        Task {
+            try? await Task.sleep(for: .milliseconds(700))
+            withAnimation(.easeOut(duration: 0.2)) { justSaved = false }
+        }
     }
 
     private func scrollToBottom(_ proxy: ScrollViewProxy, animated: Bool) {
