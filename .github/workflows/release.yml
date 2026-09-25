@@ -196,17 +196,20 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.distribute }}
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          # 主机名不写在仓库里 —— 这页没有密码，不可猜的名字是它仅有的遮挡，
+          # 而仓库是公开的。日志里也别打出来：Actions 的日志谁都能看。
+          FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
         run: |
           set -eo pipefail
-          if [ -z "$FLY_API_TOKEN" ]; then
-            echo "::error::缺少仓库 Secret FLY_API_TOKEN"
+          if [ -z "$FLY_API_TOKEN" ] || [ -z "$FLY_APP_NAME" ]; then
+            echo "::error::缺少仓库 Secret FLY_API_TOKEN 或 FLY_APP_NAME"
             exit 1
           fi
 
           curl -fsSL https://fly.io/install.sh | sh
           export PATH="$HOME/.fly/bin:$PATH"
 
-          APP=$(sed -n 's/^app = "\(.*\)"/\1/p' distribution/fly.toml)
+          APP="$FLY_APP_NAME"
           HOST="${APP}.fly.dev"
           IPA=$(find "$RUNNER_TEMP/export-adhoc" -name "*.ipa" | head -1)
 
@@ -215,11 +218,13 @@ jobs:
           flyctl apps create "$APP" --org personal 2>/dev/null || true
           # 进目录跑，让 flyctl 自己读同级的 fly.toml。给目录参数的同时再给 --config
           # 会让它把配置路径当成相对那个目录去解析，最后找的是 distribution/fly.toml/fly.toml。
+          # fly.toml 里没有 app 名，用 --app 从 Secret 传进去。
           cd distribution
-          flyctl deploy --remote-only --ha=false
+          flyctl deploy --app "$APP" --remote-only --ha=false
 
-          echo "::notice::安装页 https://${HOST}"
-          echo "### 安装页 https://${HOST}" >> "$GITHUB_STEP_SUMMARY"
+          # 地址不往日志里打。Actions 的日志是公开的，而这个主机名是这页仅有的遮挡。
+          # GitHub 会把 Secret 原样出现的地方替换成 ***，但不该指望那层兜底。
+          echo "::notice::安装页已发布（地址见仓库 Secret FLY_APP_NAME）"
 
 
       - name: Export .ipa (App Store)
