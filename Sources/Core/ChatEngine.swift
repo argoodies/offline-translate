@@ -67,13 +67,17 @@ final class ChatEngine: ObservableObject {
         do {
             try await bridge.load(modelPath: url.path, config: config) { progress in
                 Task { @MainActor [weak self] in
-                    self?.loadProgress = progress
+                    // 权重只是第一段。回调跑完之后还要建上下文 —— 分配 KV cache，
+                    // 首次启动还要编译 Metal 内核 —— 那一段 llama.cpp 不报进度。
+                    // 映射到 0…0.9，末尾留给它：进度条停在 90% 是实话，
+                    // 停在 100% 却还要等，是在说已经好了。
+                    self?.loadProgress = progress * 0.9
                 }
             }
             loadedModelPath = url.path
-            loadProgress = 1
             modelDescription = await bridge.modelInfo()?.description
             invalidateContext()
+            loadProgress = 1
             phase = .ready
         } catch {
             loadedModelPath = nil
