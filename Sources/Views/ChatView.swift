@@ -29,7 +29,7 @@ struct ChatView: View {
                     Button {
                         showConversations = true
                     } label: {
-                        Image(systemName: "list.bullet")
+                        toolbarIcon("sidebar.leading")
                     }
                     .accessibilityLabel(L("Chat list"))
                 }
@@ -37,7 +37,7 @@ struct ChatView: View {
                     Button {
                         startNewConversation()
                     } label: {
-                        Image(systemName: "square.and.pencil")
+                        toolbarIcon("square.and.pencil")
                     }
                     .accessibilityLabel(L("New chat"))
                     .disabled(engine.isGenerating)
@@ -54,6 +54,17 @@ struct ChatView: View {
             // 换会话时上一条还在念就显得很怪。
             speech.stop()
         }
+    }
+
+    /// 工具栏图标。
+    ///
+    /// 两个 SF Symbol 的字形高度和光学重心并不一致，直接摆上去会一高一低；
+    /// 统一字号再塞进等大的方框，才对得齐。
+    private func toolbarIcon(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 17, weight: .regular))
+            .frame(width: 30, height: 30)
+            .contentShape(Rectangle())
     }
 
     // MARK: - 上下文占用
@@ -200,6 +211,7 @@ struct ChatView: View {
         let text = draft
         draft = ""
         speech.stop()
+        Haptics.messageSent()
         engine.send(text, store: store)
     }
 

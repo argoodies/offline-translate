@@ -168,6 +168,7 @@ final class ChatEngine: ObservableObject {
                         if !buffer.isEmpty {
                             streamingText += buffer
                             buffer = ""
+                            Haptics.streamTick()
                         }
                         lastFlush = now
                     }

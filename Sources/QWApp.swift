@@ -12,8 +12,7 @@ struct QWApp: App {
                 .environmentObject(engine)
                 .environmentObject(store)
                 .environmentObject(speech)
-                // 白底黑字是这个 app 的设定，不跟随系统深色模式。
-                .preferredColorScheme(.light)
+                .task { Haptics.prepare() }
         }
     }
 }
