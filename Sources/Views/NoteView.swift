@@ -170,9 +170,11 @@ struct NoteView: View {
             if justSaved {
                 // 落笔的回执。无论是点「保存」还是收键盘落的笔，都先给这个勾，
                 // 再让位给「停止」—— 生成其实已经在跑了，只是先把这一下说清楚。
+                // 同一个勾，落笔后转浅：深色是「可以按」，浅色是「已经落下了」。
+                // 两个状态一样深的话，看不出刚才那下到底有没有生效。
                 Image(systemName: "checkmark")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Palette.ink)
+                    .foregroundStyle(Palette.inkTertiary)
                     .frame(width: 30, height: 30)
                     .transition(.scale.combined(with: .opacity))
             } else if engine.isGenerating {
