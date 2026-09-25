@@ -30,8 +30,8 @@ struct RootView: View {
         }
     }
 
-    /// 首次启动要把半 GB 权重 mmap 起来，得有几秒。
-    /// 进度来自 llama.cpp 的加载回调，不是假动画。
+    /// 首次启动要把半 GB 权重读进来，得有几秒。
+    /// 进度来自 llama.cpp 的加载回调，不是假动画 —— 会动的只是那道扫光。
     private var loadingScreen: some View {
         // ignoresSafeArea 要加在 ZStack 上而不是那层底色上。只染底色的话，
         // ZStack 自己仍然被安全区框着，内容居中的是安全区 —— 刘海和 Home 指示条
@@ -44,10 +44,8 @@ struct RootView: View {
                     .scaledToFit()
                     .frame(width: 112, height: 112)
 
-                ProgressView(value: engine.loadProgress)
-                    .progressViewStyle(.linear)
-                    .tint(Palette.ink)
-                    .frame(width: 180)
+                LoadingBar(progress: engine.loadProgress)
+                    .frame(width: 180, height: 4)
             }
         }
         .ignoresSafeArea()
@@ -91,5 +89,59 @@ struct RootView: View {
                 .foregroundStyle(Palette.inkSecondary)
         }
         .ignoresSafeArea()
+    }
+}
+
+/// 加载进度条。
+///
+/// 换掉系统的 `ProgressView` 是为了那道扫光。llama.cpp 只在读权重时报进度，
+/// 之后建上下文那一段完全没有回调 —— 条会一动不动地停在 90%，而静止的进度条
+/// 比慢更像死机。扫光跟进度无关，只要还在加载就一直横穿，说明这事还在进行。
+///
+/// 填充宽度仍然是真实进度，一格没有多给。
+private struct LoadingBar: View {
+    let progress: Double
+
+    @State private var sweeping = false
+
+    /// 扫光比整条窄不少，太宽就成了整条在闪。
+    private static let bandRatio = 0.38
+    private static let period = 1.25
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            let band = width * Self.bandRatio
+            let filled = width * min(max(progress, 0), 1)
+
+            ZStack(alignment: .leading) {
+                Capsule().fill(Palette.ink.opacity(0.13))
+
+                Capsule()
+                    .fill(Palette.ink)
+                    // 已填充的部分至少露一点，否则 0% 时什么都看不见，
+                    // 扫光也就无处可扫。
+                    .frame(width: max(filled, 4))
+                    // 回调按 1% 一跳，直接改宽度是一格一格地蹦；
+                    // 缓动之后是滑过去的，也顺带把跳变的间隙填上了。
+                    .animation(.easeOut(duration: 0.45), value: progress)
+                    .overlay(alignment: .leading) {
+                        LinearGradient(
+                            colors: [.clear, Palette.canvas.opacity(0.5), .clear],
+                            startPoint: .leading, endPoint: .trailing
+                        )
+                        .frame(width: band)
+                        // 扫的是整条的长度而不是已填充的长度 —— 后者会随进度变，
+                        // 动画中途改终点会让光斑忽然跳一下。多出去的部分被裁掉。
+                        .offset(x: sweeping ? width : -band)
+                    }
+                    .clipShape(Capsule())
+            }
+        }
+        .onAppear {
+            withAnimation(.linear(duration: Self.period).repeatForever(autoreverses: false)) {
+                sweeping = true
+            }
+        }
     }
 }
