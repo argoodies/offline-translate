@@ -30,9 +30,6 @@ final class ChatEngine: ObservableObject {
     /// 上一次生成因为超长被裁掉了早期对话。
     @Published private(set) var didTrimHistory = false
     @Published private(set) var modelDescription: String?
-    /// 刚刚生成完的那条回复。界面拿它触发自动朗读 —— 放在这里而不是在 ChatView 里
-    /// 比对消息数量，是为了区分「新生成的回复」和「切换会话后加载出来的历史」。
-    @Published private(set) var lastFinishedMessage: ChatMessage?
 
     private let bridge = LlamaBridge()
     private var currentTask: Task<Void, Never>?
@@ -321,9 +318,10 @@ final class ChatEngine: ObservableObject {
             if cancelled { invalidateContext() }
             return
         }
-        let message = ChatMessage(role: .assistant, text: body, reasoning: reasoning, isTruncated: truncated)
-        store.append(message, to: conversationID)
-        lastFinishedMessage = message
+        store.append(
+            ChatMessage(role: .assistant, text: body, reasoning: reasoning, isTruncated: truncated),
+            to: conversationID
+        )
         if cancelled {
             // 提前停下时 KV 里的内容和落盘的消息对不上，下轮重建。
             invalidateContext()

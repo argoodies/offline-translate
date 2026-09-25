@@ -60,10 +60,6 @@ struct ChatView: View {
                 SettingsView()
             }
         }
-        .onChange(of: engine.lastFinishedMessage) { message in
-            guard settings.autoSpeak, let message else { return }
-            speech.speak(messageID: message.id, text: message.text)
-        }
         .onChange(of: store.currentID) { _ in
             // 换会话时上一条还在念就显得很怪。
             speech.stop()
@@ -276,13 +272,18 @@ private struct MessageBubble: View {
                         .foregroundStyle(.orange)
                 }
 
-                if message.role == .assistant, !isStreaming, !message.text.isEmpty {
-                    actions
-                }
             }
             .frame(maxWidth: .infinity, alignment: message.role == .user ? .trailing : .leading)
             .contextMenu {
                 if !message.text.isEmpty {
+                    Button {
+                        speech.toggle(messageID: message.id, text: message.text)
+                    } label: {
+                        Label(
+                            isSpeaking ? String(localized: "停止朗读") : String(localized: "朗读"),
+                            systemImage: isSpeaking ? "stop.circle" : "speaker.wave.2"
+                        )
+                    }
                     Button {
                         UIPasteboard.general.string = message.text
                     } label: {
@@ -331,30 +332,6 @@ private struct MessageBubble: View {
                 .background(bubbleBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 18))
         }
-    }
-
-    private var actions: some View {
-        HStack(spacing: 16) {
-            Button {
-                speech.toggle(messageID: message.id, text: message.text)
-            } label: {
-                Image(systemName: isSpeaking ? "stop.circle" : "speaker.wave.2")
-            }
-            .accessibilityLabel(isSpeaking
-                                ? String(localized: "停止朗读")
-                                : String(localized: "朗读"))
-
-            Button {
-                UIPasteboard.general.string = message.text
-            } label: {
-                Image(systemName: "doc.on.doc")
-            }
-            .accessibilityLabel(String(localized: "复制"))
-        }
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-        .padding(.leading, 4)
-        .padding(.top, 2)
     }
 
     private var bubbleBackground: some ShapeStyle {

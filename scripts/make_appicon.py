@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """生成 App 图标（1024×1024）—— 飞行模式。
 
-沿用 iOS 控制中心里飞行模式那颗按钮的视觉：系统橙渐变打底，正中一架朝上的白色飞机。
+视觉参照 iOS 控制中心里飞行模式那颗按钮：系统橙渐变打底，正中一架朝上的白色飞机。
+
+注意这架飞机是这里手写的多边形，不是 SF Symbols 的字形。SF Symbols 的许可明确禁止
+把 symbol（以及「实质上或容易混淆地相似」的字形）用作 app icon，所以不能直接搬 —— 飞机
+剪影本身是通用符号，自己画没问题。
+
 iOS 自己会切圆角，所以这里画满整个方形、不留透明边 —— 带 alpha 的图标会被 App Store 拒。
 """
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 SIZE = 1024
 OUTPUT = "Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png"
@@ -17,15 +22,15 @@ BOTTOM = (243, 112, 0)
 # 左半边由镜像生成，保证绝对对称。
 HALF_OUTLINE = [
     (0.00, 1.00),    # 机头
-    (0.075, 0.70),
-    (0.095, 0.28),   # 翼根前缘
-    (0.92, -0.12),   # 右翼尖前缘
-    (0.92, -0.34),   # 右翼尖后缘
-    (0.095, -0.28),  # 翼根后缘
-    (0.075, -0.60),
-    (0.30, -0.80),   # 右平尾尖
-    (0.30, -0.95),
-    (0.00, -0.87),   # 尾端中点。留一点 V 形缺口，但别深到看着像两条腿。
+    (0.065, 0.66),
+    (0.085, 0.26),   # 翼根前缘
+    (0.90, -0.16),   # 右翼尖前缘：明显后掠，翼尖压到机身之下
+    (0.90, -0.33),   # 右翼尖后缘
+    (0.085, -0.30),  # 翼根后缘
+    (0.065, -0.62),
+    (0.29, -0.82),   # 右平尾尖
+    (0.29, -0.95),
+    (0.00, -0.86),   # 尾端中点。留一点 V 形缺口，但别深到看着像两条腿。
 ]
 
 
@@ -51,19 +56,31 @@ def airplane_polygon(center, scale):
     return [(cx + x * scale, cy - y * scale) for x, y in right + left]
 
 
+def rounded_mask(size, polygon, radius):
+    """画出多边形并把尖角磨圆。
+
+    先模糊再按阈值切回硬边：模糊把角上的能量摊开，阈值再切一刀，等效于给每个顶点
+    倒了个半径约 radius 的圆角。比手工在每个顶点插入贝塞尔控制点省事得多。
+    """
+    mask = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(mask).polygon(polygon, fill=255)
+    mask = mask.filter(ImageFilter.GaussianBlur(radius))
+    return mask.point(lambda v: 255 if v >= 128 else 0)
+
+
 def main():
     # 先在 4 倍尺寸上画再缩回去 —— 便宜的抗锯齿，边缘不会有台阶。
     supersample = 4
     canvas = SIZE * supersample
 
     image = vertical_gradient(canvas, TOP, BOTTOM)
-    draw = ImageDraw.Draw(image)
 
-    # 0.34 的缩放让机翼展到约 63% 宽度，四周留够 iOS 圆角要啃掉的余量。
-    draw.polygon(
-        airplane_polygon(center=(canvas / 2, canvas / 2), scale=canvas * 0.34),
-        fill=(255, 255, 255),
-    )
+    # 0.36 的缩放让机翼展到约 65% 宽度，四周留够 iOS 圆角要啃掉的余量。
+    polygon = airplane_polygon(center=(canvas / 2, canvas / 2), scale=canvas * 0.36)
+    mask = rounded_mask(canvas, polygon, radius=canvas * 0.012)
+
+    white = Image.new("RGB", (canvas, canvas), (255, 255, 255))
+    image = Image.composite(white, image, mask)
 
     image = image.resize((SIZE, SIZE), Image.LANCZOS)
     image.save(OUTPUT)

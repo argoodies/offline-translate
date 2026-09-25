@@ -12,7 +12,7 @@
 | 推理 | llama.cpp（Metal 后端） | GGUF 生态成熟，0.8B 在 A 系芯片上够快 |
 | 模型 | [Qwen3.5-0.8B](https://huggingface.co/Qwen/Qwen3.5-0.8B) GGUF，Q4_K_M（507 MB），随包安装 | 这个体积档里综合能力最好的一批，支持 201 种语言 |
 | Markdown | [swift-markdown-ui](https://github.com/gonzalezreal/swift-markdown-ui) 2.4 | 系统的 `AttributedString(markdown:)` 不支持代码块和表格 |
-| 朗读 | 系统 `AVSpeechSynthesizer` | 设备上已装的语音包同样离线 |
+| 朗读 | 系统 `AVSpeechSynthesizer` | 设备上已装的语音包同样离线；长按消息触发 |
 | 工程文件 | XcodeGen（`project.yml`） | `.xcodeproj` 不进仓库，避免 pbxproj 的合并地狱 |
 
 ```
@@ -56,6 +56,8 @@ open Aero.xcodeproj
 **联网时不让进对话。** Aero 的主张是不被打扰，所以入口直接把这件事变成一个动作：去打开飞行模式，检测到断网自动放行。
 
 需要说清楚的是，iOS **没有公开 API 能查「飞行模式是否开启」**，能查的只有网络可达性（`NWPathMonitor`）。开了飞行模式必然无网，但反过来不成立 —— 关掉 Wi-Fi 和蜂窝也算。对这个 app 来说效果等价，文案按飞行模式写。这一页还留了个「仍要继续」的出口：状态判断依赖系统回调，真出现误判时不该把人锁死在启动页。
+
+**App 图标是自己画的飞机，不是 SF Symbol。** Apple 的 SF Symbols 许可禁止把 symbol（以及「实质上或容易混淆地相似」的字形）用作 app icon，并保留要求整改的权利。飞机剪影本身是通用符号，所以 `scripts/make_appicon.py` 用多边形画了一个：先在 4 倍画布上填充，再靠「高斯模糊 + 阈值」把尖角统一磨圆 —— 比在每个顶点手工插贝塞尔控制点省事得多。
 
 **流式时不渲染 Markdown。** 生成中途的 Markdown 是半截的 —— 没闭合的代码块、写了一半的表格 —— 每 50 毫秒重新解析一次会让界面疯狂闪烁。所以生成时走纯文本，收尾后再交给 MarkdownUI。图片 provider 换成了只读 asset 的版本，堵死它默认的远程图片加载：这个 app 不该有任何出网路径。
 

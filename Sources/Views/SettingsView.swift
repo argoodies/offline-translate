@@ -39,11 +39,10 @@ struct SettingsView: View {
             .padding(.vertical, 4)
 
             Toggle(String(localized: "显示思考过程"), isOn: $settings.showReasoning)
-            Toggle(String(localized: "自动朗读回复"), isOn: $settings.autoSpeak)
         } header: {
             Text(String(localized: "对话"))
         } footer: {
-            Text(String(localized: "开启「显示思考过程」后，模型会先推理再作答 —— 更慢，但复杂问题上通常更准。关闭时它会跳过推理直接回答。改动在下一条消息生效。\n\n朗读用系统语音，同样不联网；每条回复旁边也有单独的播放按钮。"))
+            Text(String(localized: "开启「显示思考过程」后，模型会先推理再作答 —— 更慢，但复杂问题上通常更准。关闭时它会跳过推理直接回答。改动在下一条消息生效。\n\n长按任意一条消息可以朗读，用的是系统语音，同样不联网。"))
         }
     }
 
