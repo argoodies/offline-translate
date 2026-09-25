@@ -20,12 +20,6 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>CFBundleLocalizations</key>
-	<array>
-		<string>en</string>
-		<string>zh-Hans</string>
-		<string>ja</string>
-	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<!-- 只用 HTTPS 下载模型，不含任何自研加密，声明一下可以跳过每次 TestFlight 的出口合规问卷。 -->

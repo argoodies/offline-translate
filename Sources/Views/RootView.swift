@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct RootView: View {
-    @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var engine: ChatEngine
     @EnvironmentObject private var gate: NetworkGate
 
@@ -9,9 +8,7 @@ struct RootView: View {
         ZStack {
             if let modelURL = BundledModel.url {
                 ChatView()
-                    .task(id: settings.runtimeSignature) {
-                        await engine.loadModel(at: modelURL, settings: settings)
-                    }
+                    .task { await engine.loadModel(at: modelURL) }
             } else {
                 missingModel
             }

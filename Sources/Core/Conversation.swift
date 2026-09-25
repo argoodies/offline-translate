@@ -9,8 +9,6 @@ struct ChatMessage: Identifiable, Codable, Hashable {
     var id = UUID()
     var role: Role
     var text: String
-    /// 模型的思考过程。只有在设置里开启「显示思考过程」时才会被保留下来。
-    var reasoning: String?
     var date = Date()
     /// 回复是因为撞到长度上限而停的，不是模型自己说完了。
     var isTruncated = false

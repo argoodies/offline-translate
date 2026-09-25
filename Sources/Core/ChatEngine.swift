@@ -23,7 +23,6 @@ final class ChatEngine: ObservableObject {
     /// 正在生成的回复。生成期间界面从这里读，结束后才落进 ChatStore ——
     /// 每个 token 都改动会话数组会让整个消息列表重绘。
     @Published private(set) var streamingText = ""
-    @Published private(set) var streamingReasoning: String?
     @Published private(set) var stats: Stats?
     /// 上下文占用比例，0…1。给界面画那条细进度条。
     @Published private(set) var contextUsage: Double = 0
@@ -34,7 +33,6 @@ final class ChatEngine: ObservableObject {
     private let bridge = LlamaBridge()
     private var currentTask: Task<Void, Never>?
     private var loadedModelPath: String?
-    private var loadedSignature: String?
 
     /// KV cache 当前对应哪个会话 —— cache 里存的是这个会话的历史，换会话必须重置。
     private var contextConversationID: UUID?
@@ -45,9 +43,8 @@ final class ChatEngine: ObservableObject {
 
     // MARK: - 模型
 
-    func loadModel(at url: URL, settings: AppSettings) async {
-        let signature = settings.runtimeSignature
-        if loadedModelPath == url.path, loadedSignature == signature, phase == .ready {
+    func loadModel(at url: URL) async {
+        if loadedModelPath == url.path, phase == .ready {
             return
         }
 
@@ -55,21 +52,19 @@ final class ChatEngine: ObservableObject {
         phase = .loadingModel
 
         var config = LlamaBridge.Config()
-        config.contextSize = UInt32(settings.contextSize)
-        config.threadCount = Int32(settings.threadCount)
-        config.temperature = Float(settings.temperature)
-        config.topP = Float(settings.topP)
+        config.contextSize = UInt32(AppSettings.contextSize)
+        config.threadCount = Int32(AppSettings.threadCount)
+        config.temperature = Float(AppSettings.temperature)
+        config.topP = Float(AppSettings.topP)
 
         do {
             try await bridge.load(modelPath: url.path, config: config)
             loadedModelPath = url.path
-            loadedSignature = signature
             modelDescription = await bridge.modelInfo()?.description
             invalidateContext()
             phase = .ready
         } catch {
             loadedModelPath = nil
-            loadedSignature = nil
             phase = .failed(error.localizedDescription)
         }
     }
@@ -79,7 +74,6 @@ final class ChatEngine: ObservableObject {
         currentTask = nil
         await bridge.unload()
         loadedModelPath = nil
-        loadedSignature = nil
         modelDescription = nil
         invalidateContext()
         phase = .needsModel
@@ -94,32 +88,31 @@ final class ChatEngine: ObservableObject {
 
     // MARK: - 生成
 
-    func send(_ text: String, store: ChatStore, settings: AppSettings) {
+    func send(_ text: String, store: ChatStore) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, phase == .ready, let conversationID = store.currentID else { return }
 
         store.append(ChatMessage(role: .user, text: trimmed), to: conversationID)
-        generate(userMessage: trimmed, conversationID: conversationID, store: store, settings: settings)
+        generate(userMessage: trimmed, conversationID: conversationID, store: store)
     }
 
     /// 重新生成最后一条回复：撤掉上一轮问答，用同样的问题再问一次。
-    func regenerate(store: ChatStore, settings: AppSettings) {
+    func regenerate(store: ChatStore) {
         guard phase == .ready, let conversationID = store.currentID,
               let prompt = store.popLastExchange(in: conversationID) else { return }
         // KV 里还留着被撤销的那一轮，必须重建。
         invalidateContext()
         store.append(ChatMessage(role: .user, text: prompt), to: conversationID)
-        generate(userMessage: prompt, conversationID: conversationID, store: store, settings: settings)
+        generate(userMessage: prompt, conversationID: conversationID, store: store)
     }
 
     func stop() {
         currentTask?.cancel()
     }
 
-    private func generate(userMessage: String, conversationID: UUID, store: ChatStore, settings: AppSettings) {
+    private func generate(userMessage: String, conversationID: UUID, store: ChatStore) {
         currentTask?.cancel()
         streamingText = ""
-        streamingReasoning = nil
         stats = nil
         didTrimHistory = false
         phase = .generating
@@ -132,8 +125,7 @@ final class ChatEngine: ObservableObject {
                 userMessage: userMessage,
                 history: Array(history),
                 conversationID: conversationID,
-                store: store,
-                settings: settings
+                store: store
             )
         }
     }
@@ -142,8 +134,7 @@ final class ChatEngine: ObservableObject {
         userMessage: String,
         history: [ChatMessage],
         conversationID: UUID,
-        store: ChatStore,
-        settings: AppSettings
+        store: ChatStore
     ) async {
         var sanitizer = StreamSanitizer()
         let startedAt = Date()
@@ -157,8 +148,7 @@ final class ChatEngine: ObservableObject {
             try await primeContext(
                 userMessage: userMessage,
                 history: history,
-                conversationID: conversationID,
-                settings: settings
+                conversationID: conversationID
             )
 
             loop: while true {
@@ -178,7 +168,6 @@ final class ChatEngine: ObservableObject {
                             streamingText += buffer
                             buffer = ""
                         }
-                        streamingReasoning = settings.showReasoning ? sanitizer.trimmedReasoning : nil
                         lastFlush = now
                     }
                 case .endOfGeneration:
@@ -202,7 +191,6 @@ final class ChatEngine: ObservableObject {
             )
             await finish(
                 text: sanitizer.visibleText,
-                reasoning: settings.showReasoning ? sanitizer.trimmedReasoning : nil,
                 truncated: truncated,
                 conversationID: conversationID,
                 store: store,
@@ -212,7 +200,6 @@ final class ChatEngine: ObservableObject {
             // 生成到一半失败也要把已经吐出来的内容留下，不然用户白等。
             await finish(
                 text: sanitizer.visibleText,
-                reasoning: settings.showReasoning ? sanitizer.trimmedReasoning : nil,
                 truncated: true,
                 conversationID: conversationID,
                 store: store,
@@ -230,16 +217,15 @@ final class ChatEngine: ObservableObject {
     private func primeContext(
         userMessage: String,
         history: [ChatMessage],
-        conversationID: UUID,
-        settings: AppSettings
+        conversationID: UUID
     ) async throws {
-        let budget = settings.maxReplyTokens
+        let budget = AppSettings.maxReplyTokens
         let canExtend = hasOpenContext && contextConversationID == conversationID && !history.isEmpty
 
         if canExtend {
             let prompt = ChatPrompt.followUp(
                 userMessage: userMessage,
-                suppressThinking: !settings.showReasoning
+                suppressThinking: true
             )
             do {
                 try await bridge.extend(prompt: prompt, maxNewTokens: budget)
@@ -254,33 +240,31 @@ final class ChatEngine: ObservableObject {
         try await rebuild(
             userMessage: userMessage,
             history: history,
-            conversationID: conversationID,
-            settings: settings
+            conversationID: conversationID
         )
     }
 
     private func rebuild(
         userMessage: String,
         history: [ChatMessage],
-        conversationID: UUID,
-        settings: AppSettings
+        conversationID: UUID
     ) async throws {
-        let budget = settings.maxReplyTokens
+        let budget = AppSettings.maxReplyTokens
         var kept = history
 
         while true {
             await bridge.reset()
             let prompt = kept.isEmpty
                 ? ChatPrompt.opening(
-                    systemPrompt: settings.systemPrompt,
+                    systemPrompt: AppSettings.systemPrompt,
                     userMessage: userMessage,
-                    suppressThinking: !settings.showReasoning
+                    suppressThinking: true
                 )
                 : ChatPrompt.rebuild(
-                    systemPrompt: settings.systemPrompt,
+                    systemPrompt: AppSettings.systemPrompt,
                     history: kept,
                     userMessage: userMessage,
-                    suppressThinking: !settings.showReasoning
+                    suppressThinking: true
                 )
             do {
                 try await bridge.extend(prompt: prompt, maxNewTokens: budget)
@@ -304,7 +288,6 @@ final class ChatEngine: ObservableObject {
 
     private func finish(
         text: String,
-        reasoning: String?,
         truncated: Bool,
         conversationID: UUID,
         store: ChatStore,
@@ -313,7 +296,6 @@ final class ChatEngine: ObservableObject {
         await refreshContextUsage()
         let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
         streamingText = ""
-        streamingReasoning = nil
 
         guard !body.isEmpty else {
             // 一个字都没生成出来（比如立刻被取消），不要留一条空气泡。
@@ -321,7 +303,7 @@ final class ChatEngine: ObservableObject {
             return
         }
         store.append(
-            ChatMessage(role: .assistant, text: body, reasoning: reasoning, isTruncated: truncated),
+            ChatMessage(role: .assistant, text: body, isTruncated: truncated),
             to: conversationID
         )
         if cancelled {

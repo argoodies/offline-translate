@@ -3,14 +3,12 @@ import UIKit
 import MarkdownUI
 
 struct ChatView: View {
-    @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var engine: ChatEngine
     @EnvironmentObject private var store: ChatStore
     @EnvironmentObject private var speech: SpeechReader
 
     @State private var draft = ""
     @State private var showConversations = false
-    @State private var showSettings = false
     @FocusState private var inputFocused: Bool
 
     /// 滚到底部用的锚点。
@@ -35,7 +33,7 @@ struct ChatView: View {
                     }
                     .accessibilityLabel(L("Chat list"))
                 }
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         startNewConversation()
                     } label: {
@@ -43,13 +41,6 @@ struct ChatView: View {
                     }
                     .accessibilityLabel(L("New chat"))
                     .disabled(engine.isGenerating)
-
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                    .accessibilityLabel(L("Settings"))
                 }
             }
             .safeAreaInset(edge: .top, spacing: 0) {
@@ -57,9 +48,6 @@ struct ChatView: View {
             }
             .sheet(isPresented: $showConversations) {
                 ConversationListView()
-            }
-            .sheet(isPresented: $showSettings) {
-                SettingsView()
             }
         }
         .onChange(of: store.currentID) { _ in
@@ -74,25 +62,14 @@ struct ChatView: View {
     private var contextBar: some View {
         // 快满的时候才提示 —— 平时一条常驻进度条只是噪音。
         if engine.contextUsage > 0.75 {
-            VStack(spacing: 0) {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.circle")
-                    Text(engine.didTrimHistory
-                         ? L("Context was full; earlier messages were dropped")
-                         : L("Context is nearly full — consider starting a new chat"))
-                    Spacer()
-                }
+            Text(engine.didTrimHistory
+                 ? L("Context was full; earlier messages were dropped")
+                 : L("Context is nearly full — consider starting a new chat"))
                 .font(.caption2)
-                .foregroundStyle(Palette.inkSecondary)
-                .padding(.horizontal, 16)
+                .foregroundStyle(Palette.inkTertiary)
+                .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
-
-                ProgressView(value: engine.contextUsage)
-                    .progressViewStyle(.linear)
-                    .tint(Palette.ink)
-                    .frame(height: 2)
-            }
-            .background(Palette.canvas)
+                .background(Palette.canvas)
         }
     }
 
@@ -111,11 +88,7 @@ struct ChatView: View {
                     }
                     if engine.isGenerating {
                         MessageBubble(
-                            message: ChatMessage(
-                                role: .assistant,
-                                text: engine.streamingText,
-                                reasoning: engine.streamingReasoning
-                            ),
+                            message: ChatMessage(role: .assistant, text: engine.streamingText),
                             isStreaming: true
                         )
                     }
@@ -226,7 +199,7 @@ struct ChatView: View {
         let text = draft
         draft = ""
         speech.stop()
-        engine.send(text, store: store, settings: settings)
+        engine.send(text, store: store)
     }
 
     private func startNewConversation() {
@@ -244,7 +217,6 @@ private struct MessageBubble: View {
     var isStreaming = false
 
     @EnvironmentObject private var speech: SpeechReader
-    @State private var showReasoning = false
 
     private var isSpeaking: Bool { speech.speakingID == message.id }
 
@@ -253,10 +225,6 @@ private struct MessageBubble: View {
             if message.role == .user { Spacer(minLength: 40) }
 
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 6) {
-                if let reasoning = message.reasoning, !reasoning.isEmpty {
-                    reasoningBlock(reasoning)
-                }
-
                 if !message.text.isEmpty {
                     content
                 } else if isStreaming {
@@ -336,33 +304,6 @@ private struct MessageBubble: View {
             : AnyShapeStyle(Palette.bubbleAssistant)
     }
 
-    private func reasoningBlock(_ reasoning: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) { showReasoning.toggle() }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "brain")
-                    Text(L("Reasoning"))
-                    Image(systemName: showReasoning ? "chevron.up" : "chevron.down")
-                        .font(.caption2)
-                }
-                .font(.caption)
-                .foregroundStyle(Palette.inkSecondary)
-            }
-            .buttonStyle(.plain)
-
-            if showReasoning {
-                Text(reasoning)
-                    .font(.caption)
-                    .foregroundStyle(Palette.inkSecondary)
-                    .textSelection(.enabled)
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Palette.surfaceSunken, in: RoundedRectangle(cornerRadius: 12))
-            }
-        }
-    }
 }
 
 private extension Theme {

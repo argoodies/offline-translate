@@ -14,7 +14,7 @@
 | Markdown | [swift-markdown-ui](https://github.com/gonzalezreal/swift-markdown-ui) 2.4 | 系统的 `AttributedString(markdown:)` 不支持代码块和表格 |
 | 朗读 | 系统 `AVSpeechSynthesizer` | 设备上已装的语音包同样离线；长按消息触发 |
 | 配色 | 白底黑字，锁定浅色外观 | 见 `Palette.swift`，只有黑白灰，没有强调色 |
-| 语言 | 英文为基准，另有简体中文和日文，app 内可切 | 见 `Localization.swift` |
+| 语言 | 全程英语 | 包里没有 `.lproj`，key 即显示文本 |
 | 工程文件 | XcodeGen（`project.yml`） | `.xcodeproj` 不进仓库，避免 pbxproj 的合并地狱 |
 
 ```
@@ -27,15 +27,13 @@ Sources/
     BundledModel.swift    定位 bundle 里的权重文件
     NetworkGate.swift     NWPathMonitor，判断当前是否离线
     Palette.swift         全 app 的黑白灰配色
-    Localization.swift    界面语言：L(_:) 与 app 内语言切换
     MarkdownStabilizer.swift  把流式中途的半截 Markdown 补成合法的
     SpeechReader.swift    朗读回复，按回复语言选系统语音
-    AppSettings.swift     用户设置
+    AppSettings.swift     运行参数，全是常量
   Views/
     ChatView.swift             消息列表 + 输入栏，Markdown 渲染
     AirplaneGateView.swift     联网时挡在对话前的那一页
     ConversationListView.swift 会话切换、重命名、删除
-    SettingsView.swift         系统提示词、性能参数
 ```
 
 ## 本地构建
@@ -64,9 +62,9 @@ open Plai.xcodeproj
 
 判定不能只看 `path.status`：**开着飞行模式时 iOS 允许 Wi-Fi 单独留着，而且通常会自动重连**，这时 status 依然是 `.satisfied`，门就不开 —— 用户的感受是「我明明开了飞行模式」。反过来只剩 loopback 或某个虚拟接口时 status 也可能 satisfied，那既不构成打扰，也不该把人锁在门外。所以按实际使用的接口类型判（`usesInterfaceType`），并且把拦住的原因显示在关卡页上：是 Wi-Fi 还连着，还是蜂窝。
 
-**界面语言在 app 内切，不跟系统走。** iOS 自带的 per-app 语言设置藏在系统设置里，要跳出 app 才能改。这里所有文案都经过 `L(_:)`，它从 `Localization.bundle` 取字符串而不是锁死的 `Bundle.main` —— 换语言只要换掉这一个入口。切换后给根视图换 `id` 强制重建整棵树，比给每处文案挂观察者干净。
+**没有设置界面。** 上下文长度、线程数这类参数调错会让 app 在旧机型上被系统直接结束，不该让人在界面上试错；它们在 `AppSettings` 里是常量，想改就改代码重新编译。界面上只剩两个按钮：会话列表和新对话。
 
-英文是基准语言：代码里的 key 就是英文原文，`zh-Hans` 和 `ja` 提供翻译。`en.lproj` 是一份恒等映射 —— 没有它，在中文设备上选「English」会回落到 `Bundle.main`，又被系统语言带回去。
+**全程英语。** 包里没有任何 `.lproj`，代码里的 key 就是要显示的文本，`String(localized:)` 找不到译文时原样返回 key。`L(_:)` 这层薄包装留着，是为了将来要加语言时只有一个入口要改。
 
 **App 图标是画出来的，不是字体。** `scripts/make_appicon.py` 用 PIL 画白底加一道居中的黑色漩涡。
 
