@@ -126,22 +126,50 @@ actor LlamaBridge {
 
         onPreparingContext?()
 
-        var contextParams = llama_context_default_params()
-        contextParams.n_ctx = config.contextSize
-        contextParams.n_batch = config.batchSize
-        contextParams.n_ubatch = config.batchSize
-        contextParams.n_threads = config.threadCount
-        contextParams.n_threads_batch = config.threadCount
+        // 建上下文要在已经落地的 507 MB 权重之上，再要 KV cache 和计算图缓冲。
+        // 设备烫了或者内存紧了，系统就是会拒绝 —— 同一份参数昨天跑得好好的，
+        // 今天开机就 `contextCreationFailed`，试过了。
+        //
+        // 所以这里不认死一组数。要不到就减半再要，减到能要到为止：
+        // 一个只能记住 1024 token 的 app，总好过一个打不开的 app。
+        // 模型此时已经在内存里了，重试只是再建一次上下文，不用重读那半个 G。
+        var createdContext: OpaquePointer?
+        var granted = (contextSize: config.contextSize, batchSize: config.batchSize)
 
-        guard let createdContext = llama_init_from_model(loadedModel, contextParams) else {
+        for attempt in 0..<3 {
+            let shrink = UInt32(1 << attempt)
+            let size = (
+                contextSize: max(512, config.contextSize / shrink),
+                batchSize: max(64, config.batchSize / shrink)
+            )
+
+            var contextParams = llama_context_default_params()
+            contextParams.n_ctx = size.contextSize
+            contextParams.n_batch = size.batchSize
+            contextParams.n_ubatch = size.batchSize
+            contextParams.n_threads = config.threadCount
+            contextParams.n_threads_batch = config.threadCount
+
+            if let ctx = llama_init_from_model(loadedModel, contextParams) {
+                createdContext = ctx
+                granted = size
+                break
+            }
+        }
+
+        guard let createdContext else {
             llama_model_free(loadedModel)
             model = nil
             vocab = nil
             throw LlamaError.contextCreationFailed
         }
         context = createdContext
+        // 后面喂 prompt 要按实际拿到的批大小分块，裁剪历史也要按实际的上下文长度算。
+        // 记下真正生效的那一组，而不是当初想要的那一组。
+        self.config.contextSize = granted.contextSize
+        self.config.batchSize = granted.batchSize
 
-        batch = llama_batch_init(Int32(config.batchSize), 0, 1)
+        batch = llama_batch_init(Int32(granted.batchSize), 0, 1)
         batchAllocated = true
         buildSampler()
     }
