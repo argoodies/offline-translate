@@ -33,8 +33,11 @@ struct RootView: View {
     /// 首次启动要把半 GB 权重 mmap 起来，得有几秒。
     /// 进度来自 llama.cpp 的加载回调，不是假动画。
     private var loadingScreen: some View {
+        // ignoresSafeArea 要加在 ZStack 上而不是那层底色上。只染底色的话，
+        // ZStack 自己仍然被安全区框着，内容居中的是安全区 —— 刘海和 Home 指示条
+        // 的 inset 并不对称，看着就是偏的。
         ZStack {
-            Palette.canvas.ignoresSafeArea()
+            Palette.canvas
             VStack(spacing: 22) {
                 Image("Logo")
                     .resizable()
@@ -47,12 +50,13 @@ struct RootView: View {
                     .frame(width: 180)
             }
         }
+        .ignoresSafeArea()
     }
 
     /// 加载失败给条退路。否则只能杀掉 app 重开 —— 而重开多半也是同样的结果。
     private func failureScreen(_ message: String, modelURL: URL) -> some View {
         ZStack {
-            Palette.canvas.ignoresSafeArea()
+            Palette.canvas
             VStack(spacing: 18) {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.system(size: 38, weight: .light))
@@ -81,6 +85,7 @@ struct RootView: View {
                 .padding(.top, 4)
             }
         }
+        .ignoresSafeArea()
     }
 
     /// 只有构建时漏跑 fetch-model.sh 才会走到这里，正常用户看不到。
@@ -98,5 +103,6 @@ struct RootView: View {
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Palette.canvas)
+        .ignoresSafeArea()
     }
 }

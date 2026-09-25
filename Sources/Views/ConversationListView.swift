@@ -27,7 +27,14 @@ struct ConversationListView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(L("Close")) { dismiss() }
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Palette.ink)
+                            .frame(width: 30, height: 30)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel(L("Close"))
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(role: .destructive) {

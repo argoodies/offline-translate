@@ -182,10 +182,11 @@ struct NoteView: View {
                 .accessibilityLabel(L("Stop"))
                 .transition(.opacity)
             } else if hasDraft {
-                Button(L("Save")) { writing = false }
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Palette.ink)
-                    .transition(.opacity)
+                Button { writing = false } label: {
+                    toolbarIcon("checkmark")
+                }
+                .accessibilityLabel(L("Save"))
+                .transition(.opacity)
             }
         }
         // 「完成」只负责收起键盘，落笔这件事由 blur 本身触发。
