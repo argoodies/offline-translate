@@ -29,6 +29,8 @@ final class ChatEngine: ObservableObject {
     /// 上一次生成因为超长被裁掉了早期对话。
     @Published private(set) var didTrimHistory = false
     @Published private(set) var modelDescription: String?
+    /// 模型加载进度，0…1。半个 GB 的权重要映射好几秒，界面得有个交代。
+    @Published private(set) var loadProgress: Double = 0
 
     private let bridge = LlamaBridge()
     private var currentTask: Task<Void, Never>?
@@ -50,6 +52,7 @@ final class ChatEngine: ObservableObject {
 
         currentTask?.cancel()
         phase = .loadingModel
+        loadProgress = 0
 
         var config = LlamaBridge.Config()
         config.contextSize = UInt32(AppSettings.contextSize)
@@ -58,8 +61,13 @@ final class ChatEngine: ObservableObject {
         config.topP = Float(AppSettings.topP)
 
         do {
-            try await bridge.load(modelPath: url.path, config: config)
+            try await bridge.load(modelPath: url.path, config: config) { progress in
+                Task { @MainActor [weak self] in
+                    self?.loadProgress = progress
+                }
+            }
             loadedModelPath = url.path
+            loadProgress = 1
             modelDescription = await bridge.modelInfo()?.description
             invalidateContext()
             phase = .ready

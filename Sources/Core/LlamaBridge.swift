@@ -62,7 +62,12 @@ actor LlamaBridge {
 
     // MARK: - 生命周期
 
-    func load(modelPath: String, config: Config = Config()) throws {
+    /// 加载模型。`onProgress` 会在加载过程中被反复调用，参数是 0…1 的进度。
+    func load(
+        modelPath: String,
+        config: Config = Config(),
+        onProgress: ((Double) -> Void)? = nil
+    ) throws {
         unload()
         self.config = config
 
@@ -80,7 +85,26 @@ actor LlamaBridge {
         // 不要用 MLOCK：把整个模型钉在 RAM 里，iOS 会直接因内存超限杀掉 app。
         modelParams.load_mode = LLAMA_LOAD_MODE_MMAP
 
-        guard let loadedModel = llama_model_load_from_file(modelPath, modelParams) else {
+        // 把半个 GB 的权重映射进来要几秒，没有进度的话界面看着像卡死。
+        // C 回调不能捕获 Swift 闭包，所以把接收方包进一个 class，用 user_data 把指针带过去。
+        let reporter = ProgressReporter(onProgress)
+        if onProgress != nil {
+            modelParams.progress_callback_user_data = Unmanaged.passUnretained(reporter).toOpaque()
+            modelParams.progress_callback = { progress, userData in
+                guard let userData else { return true }
+                Unmanaged<ProgressReporter>.fromOpaque(userData)
+                    .takeUnretainedValue()
+                    .report(Double(progress))
+                // 返回 false 会让 llama.cpp 立刻中止加载。
+                return true
+            }
+        }
+
+        // reporter 必须活过整个加载过程 —— 上面传的是 unretained 指针。
+        let loaded = withExtendedLifetime(reporter) {
+            llama_model_load_from_file(modelPath, modelParams)
+        }
+        guard let loadedModel = loaded else {
             throw LlamaError.modelLoadFailed(URL(fileURLWithPath: modelPath).lastPathComponent)
         }
         model = loadedModel
@@ -345,5 +369,24 @@ enum LlamaError: LocalizedError {
         case .promptTooLong(let promptTokens, let contextSize):
             return L("This conversation is too long (\(promptTokens) tokens, limit \(contextSize)). Please start a new chat.")
         }
+    }
+}
+
+/// 给 llama.cpp 的加载进度回调做中转。
+///
+/// 它每加载一个 tensor 就回调一次，几百上千次 —— 每次都跳到主线程更新界面纯属浪费，
+/// 所以跨过一个百分点才往外报一次。
+private final class ProgressReporter {
+    private let onProgress: ((Double) -> Void)?
+    private var lastReported = -1.0
+
+    init(_ onProgress: ((Double) -> Void)?) {
+        self.onProgress = onProgress
+    }
+
+    func report(_ progress: Double) {
+        guard let onProgress, progress - lastReported >= 0.01 || progress >= 1 else { return }
+        lastReported = progress
+        onProgress(min(max(progress, 0), 1))
     }
 }
