@@ -117,8 +117,8 @@ struct NoteView: View {
             }
 
             if message.isTruncated {
-                // 到长度上限被截断了。一个省略号说清楚了「话没说完」，
-                // 不用一句英文句子 —— 界面上不放任何一种语言的词。
+                // 到长度上限被截断了。一个省略号说清楚了「话没说完」——
+                // 写字这一页仍然不放词，启动页和失败页那些文案不往这儿蔓延。
                 Image(systemName: "ellipsis")
                     .font(.caption2)
                     .foregroundStyle(Palette.inkTertiary)
@@ -171,8 +171,9 @@ struct NoteView: View {
 
     /// 文档末尾那支笔。空文档时它就在左上角，光标落下去就能写。
     private var composer: some View {
-        // 没有占位文案 —— 空白页上就是一根光标，跟备忘录一样。
-        TextField("", text: $draft, axis: .vertical)
+        // 只在整页还空着的时候给一句提示。已经有内容之后，光标落在正文末尾，
+        // 该做什么一目了然，再挂一句话就成了噪音。
+        TextField(store.currentMessages.isEmpty ? "Start writing" : "", text: $draft, axis: .vertical)
             .id(composerAnchor)
             .font(.body.weight(.semibold))
             .foregroundStyle(Palette.ink)
