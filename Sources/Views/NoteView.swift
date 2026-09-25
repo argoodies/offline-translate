@@ -47,34 +47,40 @@ struct NoteView: View {
     // MARK: - 文档
 
     private var document: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    ForEach(store.currentMessages) { message in
-                        paragraph(message).id(message.id)
-                    }
+        GeometryReader { geometry in
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        ForEach(store.currentMessages) { message in
+                            paragraph(message).id(message.id)
+                        }
 
-                    if engine.isGenerating {
-                        answerInProgress
-                    } else {
-                        composer
-                    }
+                        if engine.isGenerating {
+                            answerInProgress
+                        } else {
+                            composer
+                        }
 
-                    Color.clear.frame(height: 1).id(bottomAnchor)
+                        Color.clear.frame(height: 1).id(bottomAnchor)
+
+                        // 正文下面留半屏空白。一页纸本来就不会在最后一行戛然而止，
+                        // 而且这块空白是可点的 —— 想接着写，点哪儿都行。
+                        // 顺带让短笔记也能滑动，下滑收键盘那条路才始终走得通。
+                        Color.clear.frame(height: geometry.size.height * 0.5)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 22)
+                    .padding(.top, 20)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 22)
-                .padding(.top, 20)
-                .padding(.bottom, 32)
+                .background(Palette.canvas)
+                .scrollDismissesKeyboard(.interactively)
+                // 点空白处就开始写 —— 跟备忘录一样，不用去够某个输入框。
+                .contentShape(Rectangle())
+                .onTapGesture { writing = true }
+                .onChange(of: store.currentMessages.count) { _ in scrollToBottom(proxy, animated: true) }
+                .onChange(of: engine.streamingText) { _ in scrollToBottom(proxy, animated: false) }
+                .onChange(of: store.currentID) { _ in scrollToBottom(proxy, animated: false) }
             }
-            .background(Palette.canvas)
-            .scrollDismissesKeyboard(.interactively)
-            // 点空白处就开始写 —— 跟备忘录一样，不用去够某个输入框。
-            .contentShape(Rectangle())
-            .onTapGesture { writing = true }
-            .onChange(of: store.currentMessages.count) { _ in scrollToBottom(proxy, animated: true) }
-            .onChange(of: engine.streamingText) { _ in scrollToBottom(proxy, animated: false) }
-            .onChange(of: store.currentID) { _ in scrollToBottom(proxy, animated: false) }
         }
     }
 
