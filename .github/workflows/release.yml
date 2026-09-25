@@ -1,20 +1,30 @@
-name: iOS → TestFlight
+name: Build & TestFlight
 
-# XcodeGen 生成工程 → xcodebuild 自动签名归档 → altool 上传 App Store Connect。手动触发。
-# 需要仓库 secrets：ASC_KEY_ID / ASC_ISSUER_ID / ASC_API_KEY_P8。
+# 一条流水线走完：编译 → 归档 → 上传 TestFlight。
+#
+# 推到 main 就自动出包。分成两个 workflow 的时候，每次都要等 CI 绿了再手动触发一次
+# 出包，中间那一步除了让人忘掉之外没别的作用；而且两条各自 checkout、各自恢复缓存、
+# 各自拉一遍模型，白花一倍时间。
+#
+# PR 只做模拟器编译，不签名也不上传 —— 那是验证，不是发布。
+#
 # 必须用 macos-15（Xcode 26 / iOS 26 SDK），旧 SDK 会被 App Store Connect 直接退回。
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 env:
+  # 必须和 scripts/build-llama-xcframework.sh 里的默认值一致，否则缓存会认错版本。
   LLAMA_REF: b11158
   MODEL_KEY: Qwen3.5-0.8B-Q4_K_M
   TEAM_ID: "9TGD35M5GT"
   SCHEME: QW
 
 jobs:
-  testflight:
-    name: 归档并上传
+  build:
+    name: 编译并发布
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -26,18 +36,9 @@ jobs:
           sudo xcode-select -s "/Applications/Xcode_${LATEST}.app/Contents/Developer"
           xcodebuild -version
 
-      - name: Write App Store Connect API key
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
-        run: |
-          set -eo pipefail
-          mkdir -p "$HOME/.appstoreconnect/private_keys"
-          echo "$ASC_API_KEY_P8" > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
-          echo "ASC_KEY_PATH=$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" >> "$GITHUB_ENV"
-
+      # 从源码编 llama.cpp 要十来分钟，只有升级 LLAMA_REF 时才需要重来一次。
       # 用 restore + save 而不是 actions/cache：后者只在 job 成功时才写缓存，
-      # 于是一个 Swift 编译错误就会让前面十几分钟的 llama.cpp 构建白做，每次重试都重来。
+      # 于是一个 Swift 编译错误就会让前面十几分钟的构建白做，每次重试都重来。
       - name: Restore llama.xcframework
         id: llama-cache
         uses: actions/cache/restore@v4
@@ -57,7 +58,6 @@ jobs:
           key: llama-xcframework-${{ env.LLAMA_REF }}-${{ runner.os }}
 
       # 模型权重不在仓库里（507 MB，超过 GitHub 单文件上限），构建前现拉一份。
-      # 同样用 restore + save：job 失败时 actions/cache 不写缓存，下次又得重下半个 G。
       - name: Restore model weights
         id: model-cache
         uses: actions/cache/restore@v4
@@ -82,9 +82,33 @@ jobs:
           brew install xcodegen
           xcodegen generate
 
+      # PR 只验证编译。归档本身也会编译一遍，所以推到 main 时不再单独跑这步。
+      - name: Build (simulator)
+        if: github.event_name == 'pull_request'
+        run: |
+          set -eo pipefail
+          xcodebuild build \
+            -project QW.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Write App Store Connect API key
+        if: github.event_name != 'pull_request'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+        run: |
+          set -eo pipefail
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          echo "$ASC_API_KEY_P8" > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          echo "ASC_KEY_PATH=$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" >> "$GITHUB_ENV"
+
       # 每次归档都会新建一张 "Created via API" 开发证书，配额满了归档就直接失败。
       # 归档前先清掉上次留下的 —— 下面那步需要时会重新建一张。
       - name: Revoke stale CI certificates
+        if: github.event_name != 'pull_request'
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -95,6 +119,7 @@ jobs:
           "$RUNNER_TEMP/ascvenv/bin/python" scripts/revoke-stale-certs.py
 
       - name: Archive
+        if: github.event_name != 'pull_request'
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -102,7 +127,6 @@ jobs:
           set -eo pipefail
           # build 号跟随 run_number 单调递增，避免和 TestFlight 上已有的构建撞号。
           BUILD_NUM=${{ github.run_number }}
-          echo "BUILD_NUM=$BUILD_NUM" >> "$GITHUB_ENV"
 
           xcodebuild archive \
             -project QW.xcodeproj \
@@ -118,6 +142,7 @@ jobs:
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 
       - name: Export .ipa
+        if: github.event_name != 'pull_request'
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -143,7 +168,8 @@ jobs:
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 
-      - name: Upload to App Store Connect
+      - name: Upload to TestFlight
+        if: github.event_name != 'pull_request'
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
