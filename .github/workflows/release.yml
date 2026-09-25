@@ -1,12 +1,13 @@
 name: Build & TestFlight
 
-# 一条流水线走完：编译 → 归档 → 上传 TestFlight。
+# 一条流水线走完：编译 → 归档 → 上传 TestFlight。仍然是一个文件、一套缓存，
+# 但只有手动触发才会真的发布。
 #
-# 推到 main 就自动出包。分成两个 workflow 的时候，每次都要等 CI 绿了再手动触发一次
-# 出包，中间那一步除了让人忘掉之外没别的作用；而且两条各自 checkout、各自恢复缓存、
-# 各自拉一遍模型，白花一倍时间。
+# 起初是推到 main 就出包，结果当天上传二十多次，撞上了 App Store Connect 的每日
+# 上传配额（409 Upload limit reached），三条流水线连着挂在上传那一步。发布次数
+# 该由「这版值得发」决定，而不是由「刚好推了一次」决定。
 #
-# PR 只做模拟器编译，不签名也不上传 —— 那是验证，不是发布。
+# push 和 PR 都只做编译验证，不签名也不上传。
 #
 # 必须用 macos-15（Xcode 26 / iOS 26 SDK），旧 SDK 会被 App Store Connect 直接退回。
 on:
@@ -14,6 +15,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: 归档并上传 TestFlight
+        type: boolean
+        default: true
 
 env:
   # 必须和 scripts/build-llama-xcframework.sh 里的默认值一致，否则缓存会认错版本。
@@ -82,9 +88,9 @@ jobs:
           brew install xcodegen
           xcodegen generate
 
-      # PR 只验证编译。归档本身也会编译一遍，所以推到 main 时不再单独跑这步。
+      # 不发布的时候就验证能不能编译。归档本身也会编译一遍，所以真要发布时跳过这步。
       - name: Build (simulator)
-        if: github.event_name == 'pull_request'
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.release) }}
         run: |
           set -eo pipefail
           xcodebuild build \
@@ -95,7 +101,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       - name: Write App Store Connect API key
-        if: github.event_name != 'pull_request'
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
@@ -108,7 +114,7 @@ jobs:
       # 每次归档都会新建一张 "Created via API" 开发证书，配额满了归档就直接失败。
       # 归档前先清掉上次留下的 —— 下面那步需要时会重新建一张。
       - name: Revoke stale CI certificates
-        if: github.event_name != 'pull_request'
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -119,7 +125,7 @@ jobs:
           "$RUNNER_TEMP/ascvenv/bin/python" scripts/revoke-stale-certs.py
 
       - name: Archive
-        if: github.event_name != 'pull_request'
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -142,7 +148,7 @@ jobs:
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 
       - name: Export .ipa
-        if: github.event_name != 'pull_request'
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -169,7 +175,7 @@ jobs:
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 
       - name: Upload to TestFlight
-        if: github.event_name != 'pull_request'
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}

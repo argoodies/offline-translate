@@ -110,9 +110,11 @@ open QW.xcodeproj
 
 ## CI
 
-一条流水线走完：`.github/workflows/release.yml`。推到 main 就编译、归档、上传 TestFlight；PR 只做模拟器编译，不签名也不上传。
+一条流水线走完：`.github/workflows/release.yml`。push 和 PR 只做模拟器编译；手动触发（勾上 release）才归档并上传 TestFlight。
 
-分成两个 workflow 的时候，每次都要等 CI 绿了再手动触发一次出包 —— 那一步除了让人忘掉之外没别的作用，而且两条各自 checkout、各自恢复缓存、各自拉一遍模型，白花一倍时间。归档本身就会编译一遍，所以推到 main 时不再单独跑模拟器编译。
+之所以合成一个文件：分成两个 workflow 时，两条各自 checkout、各自恢复缓存、各自拉一遍 507 MB 模型，一次发布白花一倍时间。
+
+之所以发布仍要手动点：中间有一版改成了推到 main 就出包，结果当天上传二十多次，撞上 App Store Connect 的每日上传配额（`409 Upload limit reached`），连着三条流水线挂在上传那一步。发布次数该由「这版值得发」决定，而不是由「刚好推了一次」决定。
 
 上传需要仓库 secrets：`ASC_KEY_ID`、`ASC_ISSUER_ID`、`ASC_API_KEY_P8`。
 

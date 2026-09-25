@@ -160,7 +160,7 @@ struct NoteView: View {
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigationBarLeading) {
             Button { showConversations = true } label: {
-                toolbarIcon("sidebar.leading")
+                toolbarIcon("line.3.horizontal")
             }
             .accessibilityLabel(L("Notes"))
         }
