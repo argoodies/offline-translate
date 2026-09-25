@@ -352,22 +352,25 @@ enum LlamaError: LocalizedError {
     case contextExhausted
     case promptTooLong(promptTokens: Int, contextSize: Int)
 
+    /// 这些字串只进日志和崩溃报告，不再上界面 —— 界面上出错就是一个惊叹号加一个
+    /// 重试箭头。所以这里怎么写都行，按看日志的人最省事来：说清楚是哪一步崩的，
+    /// 带上原始错误码。
     var errorDescription: String? {
         switch self {
         case .notLoaded:
-            return L("The model is not loaded yet.")
+            return "The model is not loaded yet."
         case .modelLoadFailed(let name):
-            return L("Could not load \(name). The install may be damaged — please reinstall.")
+            return "Could not load \(name). The install may be damaged."
         case .contextCreationFailed:
-            return L("Failed to create the inference context. The device may be low on memory.")
+            return "Failed to create the inference context; the device may be low on memory."
         case .tokenizationFailed:
-            return L("Tokenization failed.")
+            return "Tokenization failed."
         case .decodeFailed(let code):
-            return L("Inference failed (code \(code)).")
+            return "Inference failed (code \(code))."
         case .contextExhausted:
-            return L("The context is full. Please start a new note.")
+            return "The context is full."
         case .promptTooLong(let promptTokens, let contextSize):
-            return L("This conversation is too long (\(promptTokens) tokens, limit \(contextSize)). Please start a new note.")
+            return "Prompt too long: \(promptTokens) tokens, limit \(contextSize)."
         }
     }
 }

@@ -5,6 +5,9 @@ import Foundation
 /// 没有设置界面 —— 这些就是定值。想调的话改这里重新编译，不给用户旋钮：
 /// 上下文和线程数调错会让 app 在旧机型上被系统直接结束，不该让人在界面上试错。
 enum AppSettings {
+    /// 界面上唯一一个「词」，而它是产品名，不属于任何语言。
+    /// 顶栏标题和还没写字的笔记都显示它。
+    static let title = "QW"
     /// 上下文越大越能记住长对话，但 KV cache 会线性吃内存。
     static let contextSize = 4096
     static let maxReplyTokens = 512

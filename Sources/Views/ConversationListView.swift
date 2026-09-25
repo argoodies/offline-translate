@@ -1,13 +1,15 @@
 import SwiftUI
 
+/// 所有笔记。
+///
+/// 这一页上没有一个词：标题是产品名，动作全是图形，日期和条数是数字。
+/// 原先的「删除全部」和「重命名」都拿掉了 —— 两者都要弹一个带
+/// 「取消 / 确定」的对话框，而那必然是某一种语言。删除还在，逐条左滑；
+/// 标题不用改，跟备忘录一样取正文第一行。
 struct ConversationListView: View {
     @EnvironmentObject private var store: ChatStore
     @EnvironmentObject private var engine: ChatEngine
     @Environment(\.dismiss) private var dismiss
-
-    @State private var renamingID: UUID?
-    @State private var renameText = ""
-    @State private var showDeleteAllConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -21,7 +23,7 @@ struct ConversationListView: View {
             .background(Palette.canvas)
             // 新建浮在列表下方 —— 这是这一页最主要的动作，不该藏进右上角的菜单里。
             .safeAreaInset(edge: .bottom) { newNoteButton }
-            .navigationTitle(L("Notes"))
+            .navigationTitle(AppSettings.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Palette.canvas, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -34,57 +36,26 @@ struct ConversationListView: View {
                             .frame(width: 30, height: 30)
                             .contentShape(Rectangle())
                     }
-                    .accessibilityLabel(L("Close"))
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(role: .destructive) {
-                        showDeleteAllConfirmation = true
-                    } label: {
-                        Image(systemName: "trash")
-                            .foregroundStyle(Palette.ink)
-                    }
-                    .accessibilityLabel(L("Delete all"))
-                }
-            }
-            .confirmationDialog(
-                L("Delete all notes?"),
-                isPresented: $showDeleteAllConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button(L("Delete all"), role: .destructive) {
-                    store.deleteAll()
-                    engine.invalidateContext()
-                }
-            } message: {
-                Text(L("This cannot be undone."))
-            }
-            .alert(L("Rename"), isPresented: renameBinding) {
-                TextField(L("Title"), text: $renameText)
-                Button(L("Cancel"), role: .cancel) { renamingID = nil }
-                Button(L("Save")) {
-                    if let renamingID { store.rename(renamingID, to: renameText) }
-                    renamingID = nil
+                    .accessibilityLabel("Close")
                 }
             }
         }
     }
 
+    /// 一支笔，没有字。圆形而不是胶囊 —— 少了标签之后，胶囊里裹着一个小图标
+    /// 两头空荡荡的，圆形才收得住。
     private var newNoteButton: some View {
         Button {
             select(store.startNewConversation())
         } label: {
-            Label(L("New note"), systemImage: "square.and.pencil")
-                .font(.body.weight(.medium))
+            Image(systemName: "square.and.pencil")
+                .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(Palette.canvas)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 14)
-                .background(Palette.ink, in: Capsule())
+                .frame(width: 56, height: 56)
+                .background(Palette.ink, in: Circle())
         }
+        .accessibilityLabel("New note")
         .padding(.bottom, 20)
-    }
-
-    private var renameBinding: Binding<Bool> {
-        Binding(get: { renamingID != nil }, set: { if !$0 { renamingID = nil } })
     }
 
     private func row(_ conversation: Conversation) -> some View {
@@ -98,10 +69,12 @@ struct ConversationListView: View {
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                     HStack(spacing: 6) {
-                        Text(conversation.updatedAt, format: .relative(presentation: .named))
+                        // 原先是 "2 hours ago" 那种相对时间 —— 好读，但是英文。
+                        // 换成纯数字的年月日，哪种语言的人看都一样。
+                        Text(conversation.updatedAt, format: Self.stamp)
                         if !conversation.isEmpty {
                             Text("·")
-                            Text(L("\(conversation.messages.count) messages"))
+                            Text("\(conversation.messages.count)")
                         }
                     }
                     .font(.caption2)
@@ -120,17 +93,19 @@ struct ConversationListView: View {
                 store.delete(conversation.id)
                 engine.invalidateContext()
             } label: {
-                Label(L("Delete"), systemImage: "trash")
+                Image(systemName: "trash")
             }
-            Button {
-                renameText = conversation.customTitle ?? conversation.title
-                renamingID = conversation.id
-            } label: {
-                Label(L("Rename"), systemImage: "pencil")
-            }
-            .tint(Palette.inkSecondary)
+            .accessibilityLabel("Delete")
         }
     }
+
+    /// 只有数字的时间戳。固定 POSIX 区域，免得某些语言下月份变成词。
+    private static let stamp = Date.FormatStyle
+        .dateTime
+        .year()
+        .month(.twoDigits)
+        .day(.twoDigits)
+        .locale(Locale(identifier: "en_US_POSIX"))
 
     private func select(_ id: UUID) {
         guard !engine.isGenerating else { return }

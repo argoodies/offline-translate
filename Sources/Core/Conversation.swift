@@ -25,7 +25,7 @@ struct Conversation: Identifiable, Codable, Hashable {
     var title: String {
         if let customTitle, !customTitle.isEmpty { return customTitle }
         guard let first = messages.first(where: { $0.role == .user })?.text else {
-            return L("New note")
+            return AppSettings.title
         }
         let line = first
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -97,19 +97,9 @@ final class ChatStore: ObservableObject {
         scheduleSave()
     }
 
-    func deleteAll() {
-        conversations.removeAll()
-        currentID = nil
-        startNewConversation()
-        scheduleSave()
-    }
-
-    func rename(_ id: UUID, to title: String) {
-        guard let index = index(of: id) else { return }
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        conversations[index].customTitle = trimmed.isEmpty ? nil : trimmed
-        scheduleSave()
-    }
+    // 「删除全部」和「重命名」都没有了 —— 前者不确认就一键清空太狠，后者要输入框，
+    // 而确认框和输入框都得配「取消 / 确定」，那必然是某种语言。删除还在，逐条左滑。
+    // Conversation.customTitle 保留着，老数据里存过的自定义标题照样显示。
 
     // MARK: - 消息
 

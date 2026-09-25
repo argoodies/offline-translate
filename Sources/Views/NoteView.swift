@@ -26,7 +26,7 @@ struct NoteView: View {
     var body: some View {
         NavigationStack {
             document
-                .navigationTitle(store.current?.title ?? L("New note"))
+                .navigationTitle(store.current?.title ?? AppSettings.title)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackground(Palette.canvas, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
@@ -110,7 +110,9 @@ struct NoteView: View {
             }
 
             if message.isTruncated {
-                Text(L("Reply cut off at the length limit"))
+                // 到长度上限被截断了。一个省略号说清楚了「话没说完」，
+                // 不用一句英文句子 —— 界面上不放任何一种语言的词。
+                Image(systemName: "ellipsis")
                     .font(.caption2)
                     .foregroundStyle(Palette.inkTertiary)
             }
@@ -144,7 +146,8 @@ struct NoteView: View {
 
     /// 文档末尾那支笔。空文档时它就在左上角，光标落下去就能写。
     private var composer: some View {
-        TextField(store.currentMessages.isEmpty ? L("Start writing…") : "", text: $draft, axis: .vertical)
+        // 没有占位文案 —— 空白页上就是一根光标，跟备忘录一样。
+        TextField("", text: $draft, axis: .vertical)
             .id(composerAnchor)
             .font(.body.weight(.semibold))
             .foregroundStyle(Palette.ink)
@@ -162,7 +165,7 @@ struct NoteView: View {
             Button { showConversations = true } label: {
                 toolbarIcon("line.3.horizontal")
             }
-            .accessibilityLabel(L("Notes"))
+            .accessibilityLabel("Notes")
         }
         // 新建挪到了列表页那个浮起来的按钮上。这里生成时是「停止」，
         // 正在写且写了东西时是「保存」—— 它干的也是收笔：blur 一发生，那段就落定。
@@ -181,13 +184,13 @@ struct NoteView: View {
                 Button { engine.stop() } label: {
                     toolbarIcon("stop.circle")
                 }
-                .accessibilityLabel(L("Stop"))
+                .accessibilityLabel("Stop")
                 .transition(.opacity)
             } else if hasDraft {
                 Button { writing = false } label: {
                     toolbarIcon("checkmark")
                 }
-                .accessibilityLabel(L("Save"))
+                .accessibilityLabel("Save")
                 .transition(.opacity)
             }
         }
@@ -207,42 +210,54 @@ struct NoteView: View {
             .contentShape(Rectangle())
     }
 
+    /// 长按一段弹出来的操作。只给图形，不给词 —— 朗读、拷贝、分享这三个
+    /// 系统图标本身就够认，VoiceOver 那边另有说明（accessibilityLabel 不显示在屏幕上）。
     @ViewBuilder
     private func actions(for message: ChatMessage) -> some View {
         if !message.text.isEmpty {
+            let speaking = speech.speakingID == message.id
             Button {
                 speech.toggle(messageID: message.id, text: message.text)
             } label: {
-                Label(
-                    speech.speakingID == message.id ? L("Stop reading") : L("Read aloud"),
-                    systemImage: speech.speakingID == message.id ? "stop.circle" : "speaker.wave.2"
-                )
+                Image(systemName: speaking ? "stop.circle" : "speaker.wave.2")
             }
+            .accessibilityLabel(speaking ? "Stop reading" : "Read aloud")
+
             Button {
                 UIPasteboard.general.string = message.text
             } label: {
-                Label(L("Copy"), systemImage: "doc.on.doc")
+                Image(systemName: "doc.on.doc")
             }
+            .accessibilityLabel("Copy")
+
             ShareLink(item: message.text) {
-                Label(L("Share"), systemImage: "square.and.arrow.up")
+                Image(systemName: "square.and.arrow.up")
             }
+            .accessibilityLabel("Share")
         }
     }
 
     // MARK: - 上下文提示
 
+    /// 上下文快满了的提示。原本是一句英文，现在是一根细线 ——
+    /// 说的本来就是「还剩多少」这种量，一条渐渐填满的线比一句话更直接，
+    /// 也不用挑语言。快满的时候才出现，平时一条常驻进度条只是噪音。
     @ViewBuilder
     private var contextBar: some View {
-        // 快满的时候才提示 —— 平时一条常驻进度条只是噪音。
         if engine.contextUsage > 0.75 {
-            Text(engine.didTrimHistory
-                 ? L("Context was full; earlier messages were dropped")
-                 : L("Context is nearly full — consider starting a new note"))
-                .font(.caption2)
-                .foregroundStyle(Palette.inkTertiary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-                .background(Palette.canvas)
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Palette.inkTertiary.opacity(0.3))
+                    Capsule()
+                        .fill(engine.didTrimHistory ? Palette.ink : Palette.inkSecondary)
+                        .frame(width: geometry.size.width * min(1, engine.contextUsage))
+                }
+            }
+            .frame(height: 2)
+            .padding(.horizontal, 22)
+            .padding(.bottom, 8)
+            .background(Palette.canvas)
+            .animation(.easeOut(duration: 0.3), value: engine.contextUsage)
         }
     }
 

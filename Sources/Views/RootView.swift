@@ -22,8 +22,8 @@ struct RootView: View {
         switch engine.phase {
         case .loadingModel:
             loadingScreen.transition(.opacity)
-        case .loadFailed(let message):
-            failureScreen(message, modelURL: modelURL).transition(.opacity)
+        case .loadFailed:
+            failureScreen(modelURL: modelURL).transition(.opacity)
         case .ready, .generating, .failed:
             // .failed 是单轮生成出错，模型还在 —— 留在文档里，下一段接着写。
             NoteView().transition(.opacity)
@@ -54,55 +54,42 @@ struct RootView: View {
     }
 
     /// 加载失败给条退路。否则只能杀掉 app 重开 —— 而重开多半也是同样的结果。
-    private func failureScreen(_ message: String, modelURL: URL) -> some View {
+    ///
+    /// 原先这里写着失败原因和一个「Try again」按钮。现在只剩两个图形：一个惊叹号
+    /// 说明出事了，一个转圈箭头说明能重来。具体是哪种错误对用户没用 —— 能做的
+    /// 只有再试一次，而这一点图标已经说清楚了。
+    private func failureScreen(modelURL: URL) -> some View {
         ZStack {
             Palette.canvas
-            VStack(spacing: 18) {
+            VStack(spacing: 28) {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.system(size: 38, weight: .light))
                     .foregroundStyle(Palette.inkSecondary)
 
-                Text(L("Could not load the model"))
-                    .font(.headline)
-                    .foregroundStyle(Palette.ink)
-
-                Text(message)
-                    .font(.footnote)
-                    .foregroundStyle(Palette.inkSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-
                 Button {
                     Task { await engine.loadModel(at: modelURL) }
                 } label: {
-                    Text(L("Try again"))
-                        .font(.subheadline.weight(.medium))
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(Palette.canvas)
-                        .padding(.horizontal, 28)
-                        .padding(.vertical, 11)
-                        .background(Palette.ink, in: Capsule())
+                        .frame(width: 56, height: 56)
+                        .background(Palette.ink, in: Circle())
                 }
-                .padding(.top, 4)
+                .accessibilityLabel("Try again")
             }
         }
         .ignoresSafeArea()
     }
 
     /// 只有构建时漏跑 fetch-model.sh 才会走到这里，正常用户看不到。
+    /// 没有重试按钮 —— 包本身就是残的，再试一次也变不出模型来。
     private var missingModel: some View {
-        VStack(spacing: 12) {
+        ZStack {
+            Palette.canvas
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 40, weight: .light))
                 .foregroundStyle(Palette.inkSecondary)
-            Text(L("The model file is missing"))
-                .font(.headline)
-            Text(L("This build is incomplete. Please reinstall."))
-                .font(.subheadline)
-                .foregroundStyle(Palette.inkSecondary)
         }
-        .padding(40)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Palette.canvas)
         .ignoresSafeArea()
     }
 }
