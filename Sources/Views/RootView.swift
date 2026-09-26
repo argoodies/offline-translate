@@ -92,7 +92,7 @@ struct RootView: View {
                     // 条和文案共用一个时钟：文案也要随时间变（等久了要改口），
                     // 不能只靠状态驱动。
                     TimelineView(.periodic(from: .now, by: 1.0 / 30)) { timeline in
-                        VStack(spacing: 22) {
+                        VStack(spacing: Self.barToCaption) {
                             LoadingBar(progress: scriptedProgress(at: timeline.date))
                                 .frame(width: 180, height: 4)
 
@@ -100,14 +100,16 @@ struct RootView: View {
                                 .font(.footnote)
                                 .foregroundStyle(Palette.inkSecondary)
                                 .multilineTextAlignment(.center)
-                                .padding(.horizontal, 40)
                                 .animation(.easeOut(duration: 0.25), value: loadingCaption(at: timeline.date))
                         }
                     }
-                    .frame(width: 280, height: 70)
+                    // 只固定宽度，不固定高度。给了固定高度，这一块就变成「内容在盒子里
+                    // 居中」—— 文案从一行变两行时，条会被顶着往上走。现在条的位置由
+                    // 下面那个 offset 一个人说了算，文案只往下长。
+                    .frame(width: 240)
                     // overlay 的 .top 对齐的是 logo 的上边，所以要整个 logo 的高度
                     // 再加一段间距才落到它下面。overlay 超出父视图不会被裁。
-                    .offset(y: Self.logoSize + 22)
+                    .offset(y: Self.logoSize + Self.logoToBar)
                 }
         }
         .ignoresSafeArea()
@@ -141,8 +143,12 @@ struct RootView: View {
         }
     }
 
-    /// logo 边长。条和文案靠它算偏移，得是同一个数。
+    /// logo 边长。条靠它算偏移，得是同一个数。
     private static let logoSize: CGFloat = 112
+    /// logo 下边到进度条的距离。
+    private static let logoToBar: CGFloat = 22
+    /// 进度条到文案的距离。固定值 —— 文案换行不影响它，条也不会跟着动。
+    private static let barToCaption: CGFloat = 22
 
     /// 读权重那段爬到 50% 用的时间。
     private static let weightsRamp: TimeInterval = 60
