@@ -68,33 +68,22 @@ struct NoteView: View {
 
                         Color.clear.frame(height: 1).id(bottomAnchor)
 
-                        // 写字的时候在光标下面留半屏空白。它是全文唯一一处点了会收笔的
-                        // 地方 —— 收笔即提交，是个收不回来的动作，不该让人一个手滑就触发；
-                        // 这块在正文下方、光标后面，往那儿点本来就带着「写完了」的意思。
+                        // 正文下面永远留半屏空白。一页纸本来就不会在最后一行戛然而止，
+                        // 而且这块空白有活干：没在写就落笔，正在写就收笔 —— 它在光标
+                        // 后面，往那儿点本来就带着「写完了」的意思，位置本身就是意图。
                         // 顺带给 scrollDismissesKeyboard 留出可滑的余量。
-                        //
-                        // 不写的时候它不在。留着的话「内容的底部」就是这片空白的底部，
-                        // 而进一页笔记该停在最后一行字上，不是停在一片空白上。
-                        if writing {
-                            Color.clear
-                                .frame(height: geometry.size.height * 0.5)
-                                .contentShape(Rectangle())
-                                .onTapGesture { writing = false }
-                        }
+                        Color.clear
+                            .frame(height: geometry.size.height * 0.5)
+                            .contentShape(Rectangle())
+                            .onTapGesture { writing.toggle() }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 22)
                     .padding(.top, 20)
-                    // 短笔记也撑满一屏，好让 tapCatcher 铺到正文下面那片空地上 ——
-                    // 否则点正文以下的地方什么也不会发生。撑满而已，不产生滚动余量。
-                    .frame(minHeight: geometry.size.height, alignment: .top)
                     .background(tapCatcher)
                 }
                 .background(Palette.canvas)
                 .scrollDismissesKeyboard(.interactively)
-                // 进来就停在最后一行字上。只管初始位置，不管后续内容变化 ——
-                // 后者归下面那几个 onChange 管，混在一起的话打字时视图会被拽向底部。
-                .defaultScrollAnchor(.bottom, for: .initialOffset)
                 // 开始写的时候把下方那半屏留白滑出来，让落笔的位置尽量靠上 ——
                 // 否则光标贴着键盘，能看见的正文只剩一两行。
                 .onChange(of: writing) { isWriting in
@@ -106,6 +95,21 @@ struct NoteView: View {
                 .onChange(of: store.currentMessages.count) { _ in scrollToBottom(proxy, animated: true) }
                 .onChange(of: engine.streamingText) { _ in scrollToBottom(proxy, animated: false) }
                 .onChange(of: store.currentID) { _ in scrollToBottom(proxy, animated: false) }
+                // 冷启动直接落在一页有内容的笔记上时，上面那几个 onChange 一个都不会触发。
+                //
+                // 这里不能用 `defaultScrollAnchor(.bottom)`：正文下面永远挂着半屏留白，
+                // 「内容的底部」是那片空地的底部，锚过去就是开屏对着一片空白。要停在
+                // 最后一行字上，只能瞄 bottomAnchor 这个具体位置。
+                //
+                // 滚好几次，不是一次。这一下跟加载页淡出的转场撞在一起，正文高度还没
+                // 算完 —— 这时候发出去的 scrollTo 会被安静地吞掉，什么也不做也不报错。
+                // 内容没变的时候反复滚到同一处没有副作用，早滚到了就是白跑几圈。
+                .task {
+                    for gap in [0, 120, 200, 300, 500] {
+                        if gap > 0 { try? await Task.sleep(for: .milliseconds(gap)) }
+                        scrollToBottom(proxy, animated: false)
+                    }
+                }
             }
         }
     }
