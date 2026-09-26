@@ -7,14 +7,14 @@ struct RootView: View {
     @State private var loadStartedAt = Date()
     /// 权重读完、开始建上下文的时刻。
     @State private var gpuStartedAt: Date?
-    /// 真正就绪的时刻。就绪之后条子还要走满、停一秒，这一秒里才放人进去。
+    /// 真正就绪的时刻。就绪之后条子还要走满、停两秒，那两秒里才放人进去。
     @State private var finishStartedAt: Date?
     /// 就绪那一刻条子走到哪儿了。从这个位置滑到 100%，不是硬跳。
     @State private var progressAtFinish: Double = 0
     /// 这一轮加载的收尾演过了没有 —— 之后 phase 在 ready / generating 之间来回，
     /// 不该每次都重放一遍。
     @State private var finishShown = false
-    /// 正停在 100% 那一秒里。
+    /// 正停在 100% 那两秒里。
     @State private var holdingFinish = false
 
     var body: some View {
