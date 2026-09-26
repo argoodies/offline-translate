@@ -7,6 +7,15 @@ struct RootView: View {
     @State private var loadStartedAt = Date()
     /// 权重读完、开始建上下文的时刻。
     @State private var gpuStartedAt: Date?
+    /// 真正就绪的时刻。就绪之后条子还要走满、停一秒，这一秒里才放人进去。
+    @State private var finishStartedAt: Date?
+    /// 就绪那一刻条子走到哪儿了。从这个位置滑到 100%，不是硬跳。
+    @State private var progressAtFinish: Double = 0
+    /// 这一轮加载的收尾演过了没有 —— 之后 phase 在 ready / generating 之间来回，
+    /// 不该每次都重放一遍。
+    @State private var finishShown = false
+    /// 正停在 100% 那一秒里。
+    @State private var holdingFinish = false
 
     var body: some View {
         Group {
@@ -18,11 +27,28 @@ struct RootView: View {
             }
         }
         .animation(.easeOut(duration: 0.25), value: engine.phase)
-        // 重试也是一轮新的加载，两个锚点都要重新起算。
+        .animation(.easeOut(duration: 0.25), value: holdingFinish)
         .onChange(of: engine.phase) { phase in
-            guard phase == .loadingModel else { return }
-            loadStartedAt = Date()
-            gpuStartedAt = nil
+            // 重试也是一轮新的加载，所有锚点重新起算。
+            if phase == .loadingModel {
+                loadStartedAt = Date()
+                gpuStartedAt = nil
+                finishStartedAt = nil
+                finishShown = false
+                return
+            }
+            // 就绪了先别急着换屏：条子滑满，底下那句话说完，停一秒再走。
+            // 这一秒是这个 app 唯一一次主动提「它不用网」的机会 —— 进了正文页之后
+            // 满屏都是留白和图形，没有地方讲这件事，而这恰恰是它唯一的卖点。
+            guard phase == .ready, !finishShown else { return }
+            finishShown = true
+            progressAtFinish = scriptedProgress(at: Date())
+            finishStartedAt = Date()
+            holdingFinish = true
+            Task {
+                try? await Task.sleep(for: .seconds(Self.finishHold))
+                holdingFinish = false
+            }
         }
         .onChange(of: engine.loadStage) { stage in
             if stage == .preparingContext, gpuStartedAt == nil { gpuStartedAt = Date() }
@@ -33,12 +59,11 @@ struct RootView: View {
     /// 只有加载成功（或重试成功）才进得去。
     @ViewBuilder
     private func content(modelURL: URL) -> some View {
-        switch engine.phase {
-        case .loadingModel:
-            loadingScreen.transition(.opacity)
-        case .loadFailed(let message):
+        if case .loadFailed(let message) = engine.phase {
             failureScreen(message, modelURL: modelURL).transition(.opacity)
-        case .ready, .generating, .failed:
+        } else if engine.phase == .loadingModel || holdingFinish {
+            loadingScreen.transition(.opacity)
+        } else {
             // .failed 是单轮生成出错，模型还在 —— 留在文档里，下一段接着写。
             NoteView().transition(.opacity)
         }
@@ -93,6 +118,11 @@ struct RootView: View {
     /// 代价要认：这是假的。快的机器上条子会比实际慢，慢的机器上会比实际快。
     /// 它诚实的地方只剩一处 —— 走完 95% 那一下是真就绪，不是定时器到点。
     private func scriptedProgress(at now: Date) -> Double {
+        // 收尾：从就绪那一刻的位置滑到满，然后停在满。
+        if let finishStartedAt {
+            let t = now.timeIntervalSince(finishStartedAt) / Self.finishRamp
+            return progressAtFinish + (1 - progressAtFinish) * min(1, max(0, t))
+        }
         switch engine.loadStage {
         case .weights:
             let t = now.timeIntervalSince(loadStartedAt) / Self.weightsRamp
@@ -107,6 +137,10 @@ struct RootView: View {
     private static let weightsRamp: TimeInterval = 60
     /// 建上下文那段从 90% 挪到 95% 用的时间。
     private static let gpuRamp: TimeInterval = 10
+    /// 就绪后条子滑到 100% 用的时间。
+    private static let finishRamp: TimeInterval = 0.35
+    /// 满格之后停留多久再进正文页。
+    private static let finishHold: TimeInterval = 1
 
     /// 如实写现在在干什么。
     ///
@@ -117,6 +151,7 @@ struct RootView: View {
     /// 没写「Compiling shaders」是因为那只有第一次成立，之后走系统缓存 ——
     /// 每次都那么说就是假话了。
     private var loadingCaption: String {
+        if holdingFinish { return "Ready. No connection needed, ever." }
         switch engine.loadStage {
         case .weights: return "Reading \(BundledModel.displayName) weights"
         case .preparingContext: return "Preparing the GPU"
