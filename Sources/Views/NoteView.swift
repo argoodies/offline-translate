@@ -98,6 +98,14 @@ struct NoteView: View {
                 .onChange(of: store.currentMessages.count) { _ in scrollToBottom(proxy, animated: true) }
                 .onChange(of: engine.streamingText) { _ in scrollToBottom(proxy, animated: false) }
                 .onChange(of: store.currentID) { _ in scrollToBottom(proxy, animated: false) }
+                // 冷启动直接落在一页有内容的笔记上时，上面那几个 onChange 一个都不会触发。
+                // 有内容的笔记不自动落笔，所以进来看到的第一眼就是它的初始位置 ——
+                // 那一眼该是最后写到的地方，不是半年前的开头。等一拍是为了让布局先算完，
+                // 高度还没定下来就滚，滚不到底。
+                .task {
+                    try? await Task.sleep(for: .milliseconds(120))
+                    scrollToBottom(proxy, animated: false)
+                }
             }
         }
     }
@@ -128,27 +136,24 @@ struct NoteView: View {
         .contextMenu { actions(for: message) }
     }
 
-    /// 正在写出来的回答，末尾跟着一颗跳动的点。
+    /// 正在写出来的回答。
     ///
-    /// 点是接在正文里的行内图片，所以跟着文字排版走：最后一行短就挨在那一行末尾，
-    /// 换行了自己跟过去 —— 像光标，而不是底下另起一行的指示器。原理见 `StreamingCursor`。
+    /// 第一个字出来之前是一颗跳动的点，出来之后点就没了 —— 它顶替的只是
+    /// 「按下去之后什么都没发生」那几秒。字一开始流，文字自己就是最好的进度指示，
+    /// 旁边再挂个点只是抢注意力。
     ///
-    /// `TimelineView` 按帧推相位。它不只是好看：模型卡壳几秒不出字的时候，
-    /// 屏幕上唯一还在动的就是这颗点，否则「在想」和「死了」长得一模一样。
+    /// 中间试过让点一直跟到末尾、像光标那样随文字排版走。做得到（把点做成行内
+    /// 图片、逐帧换图），但为此每秒要重解析十几次 Markdown，而换来的东西在有字的
+    /// 时候本来就没人看。拆了。
+    @ViewBuilder
     private var answerInProgress: some View {
-        TimelineView(.periodic(from: .now, by: StreamingCursor.period / Double(StreamingCursor.phaseCount))) { timeline in
-            let phase = StreamingCursor.phase(at: timeline.date)
-            Markdown(
-                MarkdownStabilizer.stabilized(engine.streamingText)
-                    + StreamingCursor.markdownSuffix(phase: phase)
-            )
-            .markdownTheme(.note)
-            .markdownImageProvider(.asset)
-            // 这里换成只认光标的那个 —— 顺带仍然堵死远程图片。
-            .markdownInlineImageProvider(.streamingCursor)
-            .textSelection(.enabled)
+        if engine.streamingText.isEmpty {
+            BouncingDot()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            answerBody(engine.streamingText)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// 模型回答的正文。
@@ -312,22 +317,22 @@ struct NoteView: View {
         writing && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// 进到一页笔记就落笔，不管它是空的还是已经写满了。
+    /// 空白的笔记一进来就落笔。
     ///
-    /// 打开一页笔记本来就是为了写东西，进来还要再点一下屏幕纯属多余。一度只在空白
-    /// 笔记上这么做，理由是「翻回旧笔记多半是为了看」—— 但那是替人猜意图，而收键盘
-    /// 的代价远小于每次都要多点一下。不想写的话往下一滑就收了。
+    /// 新开一页本来就是为了写东西，还要再点一下屏幕纯属多余。已经有内容的笔记不抢
+    /// 焦点 —— 那种页面打开多半是回来看的，键盘一上来就吃掉半屏正文，而正文才是
+    /// 回来的理由。想接着写，点一下就是了。
     ///
-    /// 生成中不抢焦点：那时候输入框根本不在视图里，让位给正在写出来的回答。
+    /// 生成中也不抢：那时候输入框根本不在视图里，位置让给正在写出来的回答。
     ///
     /// 要等一拍再要焦点。这一下多半跟着列表页的收起动画一起发生，而转场当中提焦点
     /// 系统会直接忽略，键盘不会上来。落地之后再要，才要得到。
     private func focusOnArrival() {
-        guard !engine.isGenerating else { return }
+        guard store.currentMessages.isEmpty, !engine.isGenerating else { return }
         Task {
             try? await Task.sleep(for: .milliseconds(400))
-            // 这 400 毫秒里模型可能已经开始回答了。
-            guard !engine.isGenerating else { return }
+            // 这 400 毫秒里可能已经换了笔记，或者模型开始回答了。
+            guard store.currentMessages.isEmpty, !engine.isGenerating else { return }
             writing = true
         }
     }
@@ -393,4 +398,34 @@ private extension Theme {
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .markdownMargin(top: 6, bottom: 12)
         }
+}
+
+/// 等第一个字的时候那颗跳动的点。
+///
+/// 一边弹一边明暗：只弹的话在纯白底上太硬，只闪的话又像故障灯。两个动画同一个
+/// 时钟、同一段时长，所以是「浮起来的时候亮，落下去的时候暗」，像有东西在呼吸。
+private struct BouncingDot: View {
+    @State private var up = false
+
+    private static let size: CGFloat = 7
+    private static let lift: CGFloat = 5
+    private static let period = 0.55
+
+    var body: some View {
+        Circle()
+            .fill(Palette.ink)
+            .frame(width: Self.size, height: Self.size)
+            .opacity(up ? 1 : 0.3)
+            .offset(y: up ? -Self.lift : 0)
+            // 占位高度算上弹起的幅度，否则点一跳，下面的留白跟着抖。
+            .frame(height: Self.size + Self.lift, alignment: .bottom)
+            .onAppear {
+                withAnimation(
+                    .easeInOut(duration: Self.period).repeatForever(autoreverses: true)
+                ) {
+                    up = true
+                }
+            }
+            .accessibilityHidden(true)
+    }
 }
