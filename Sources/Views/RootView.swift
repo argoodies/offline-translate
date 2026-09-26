@@ -80,34 +80,36 @@ struct RootView: View {
         // 的 inset 并不对称，看着就是偏的。
         ZStack {
             Palette.canvas
-            VStack(spacing: 22) {
-                Image("Logo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 112, height: 112)
 
-                // 条和文案共用一个时钟：文案也要随时间变（等久了要改口），
-                // 不能只靠状态驱动。
-                TimelineView(.periodic(from: .now, by: 1.0 / 30)) { timeline in
-                    VStack(spacing: 22) {
-                        LoadingBar(progress: scriptedProgress(at: timeline.date))
-                            .frame(width: 180, height: 4)
+            // 居中的是 logo 一个人，条和文案挂在它下面、不参与居中。
+            // 原先三样打包进一个 VStack 一起居中，logo 就被条和文案的高度顶到
+            // 中线上方去了 —— 而这一屏的视觉锚点就是 logo，它偏了整屏都是偏的。
+            Image("Logo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: Self.logoSize, height: Self.logoSize)
+                .overlay(alignment: .top) {
+                    // 条和文案共用一个时钟：文案也要随时间变（等久了要改口），
+                    // 不能只靠状态驱动。
+                    TimelineView(.periodic(from: .now, by: 1.0 / 30)) { timeline in
+                        VStack(spacing: 22) {
+                            LoadingBar(progress: scriptedProgress(at: timeline.date))
+                                .frame(width: 180, height: 4)
 
-                        Text(loadingCaption(at: timeline.date))
-                            .font(.footnote)
-                            .foregroundStyle(Palette.inkSecondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 40)
-                            .animation(.easeOut(duration: 0.25), value: loadingCaption(at: timeline.date))
+                            Text(loadingCaption(at: timeline.date))
+                                .font(.footnote)
+                                .foregroundStyle(Palette.inkSecondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                                .animation(.easeOut(duration: 0.25), value: loadingCaption(at: timeline.date))
+                        }
                     }
+                    .frame(width: 280, height: 70)
+                    // overlay 的 .top 对齐的是 logo 的上边，所以要整个 logo 的高度
+                    // 再加一段间距才落到它下面。overlay 超出父视图不会被裁。
+                    .offset(y: Self.logoSize + 22)
                 }
-                .frame(width: 280, height: 70)
-            }
         }
-        // 整屏可敲。等半分钟太无聊了，而一块戳下去有反应的屏幕，至少不像死的。
-        // 它什么也不改变 —— 加载不会因此变快，只是有点事做。
-        .contentShape(Rectangle())
-        .onTapGesture { Haptics.idleTap() }
         .ignoresSafeArea()
     }
 
@@ -138,6 +140,9 @@ struct RootView: View {
             return 0.9 + 0.05 * min(1, max(0, t))
         }
     }
+
+    /// logo 边长。条和文案靠它算偏移，得是同一个数。
+    private static let logoSize: CGFloat = 112
 
     /// 读权重那段爬到 50% 用的时间。
     private static let weightsRamp: TimeInterval = 60
@@ -170,16 +175,16 @@ struct RootView: View {
             return "Reading \(BundledModel.displayName) weights"
 
         case .preparingContext:
-            // 这一步在装完第一次运行时会非常久：llama.cpp 的 Metal 内核是运行时
-            // 从源码编出来的（`GGML_METAL_EMBED_LIBRARY=ON`），几百个 kernel 在手机
-            // GPU 上从头编一遍。编完进系统缓存，所以以后每次都是几秒。
+            // 这一步现在只要几秒 —— Metal 内核在构建时就编好了打进包
+            // （`GGML_METAL_EMBED_LIBRARY=OFF`），运行时只是加载一个文件。
+            // 曾经这里要几分钟，因为那几百个 kernel 是在手机上现编的。
             //
-            // 卡在同一句话上几分钟，跟死机没有区别 —— 而它其实在干活，只是干的活
-            // 一辈子只干这一次。超过 20 秒就改口说清楚：说明白了，人愿意等；
-            // 不说，人只会以为坏了然后去删 app。
+            // 底下这句改口留着当保险，不是当常态：真要是在某台机器上又慢下来，
+            // 卡在同一句话上不动跟死机没有区别。但它不再断言原因 —— 上一版
+            // 咬定是在编着色器，那句话在编译挪走之后就变成假话了。
             let waited = now.timeIntervalSince(gpuStartedAt ?? now)
             return waited > Self.longWaitAfter
-                ? "Building GPU shaders. This happens once, on the first launch, and can take a few minutes."
+                ? "Still preparing the GPU. Hang on."
                 : "Preparing the GPU"
         }
     }
