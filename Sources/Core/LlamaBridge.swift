@@ -127,21 +127,37 @@ actor LlamaBridge {
 
         onPreparingContext?()
 
-        // 建上下文要在已经落地的 507 MB 权重之上，再要 KV cache 和计算图缓冲。
-        // 设备烫了或者内存紧了，系统就是会拒绝 —— 同一份参数昨天跑得好好的，
-        // 今天开机就 `contextCreationFailed`，试过了。
+        // 建上下文这一步会失败，而且是刚装完那几次必然失败、开到第三四次突然就好了。
         //
-        // 所以这里不认死一组数。要不到就减半再要，减到能要到为止：
-        // 一个只能记住 1024 token 的 app，总好过一个打不开的 app。
-        // 模型此时已经在内存里了，重试只是再建一次上下文，不用重读那半个 G。
+        // 一度以为是内存或者过热，直到把数字打出来：失败当时空着 2 GB，机器 cool。
+        // 两个猜测同时出局。剩下的解释指向这一步里另一件事 —— 首次运行要编译 Metal
+        // 内核，编完进系统着色器缓存。「攒够几次就再也不用编」正好对上那个症状。
+        //
+        // 所以重试的形状跟着改：先按原尺寸多试几次，中间真的等一会儿。原来那版是
+        // 立刻缩小尺寸再试，两头都错 —— 不是内存问题，缩小没用；而「立刻」等于没等。
+        // 缩小留在最后两档兜底，万一某台机器上真是内存不够。
+        let attempts: [(delay: Duration, shrink: UInt32)] = [
+            (.zero, 1),
+            (.milliseconds(400), 1),
+            (.milliseconds(900), 1),
+            (.milliseconds(900), 2),
+            (.milliseconds(900), 4),
+        ]
+
         var createdContext: OpaquePointer?
         var granted = (contextSize: config.contextSize, batchSize: config.batchSize)
 
-        for attempt in 0..<3 {
-            let shrink = UInt32(1 << attempt)
+        for attempt in attempts {
+            if attempt.delay > .zero {
+                // actor 里同步等着。这一步本来就在后台线程上，而且此刻界面正停在
+                // 「Preparing the GPU」那句话上 —— 多等一秒没人看得出来，
+                // 打不开才是看得出来的。
+                Thread.sleep(forTimeInterval: attempt.delay.seconds)
+            }
+
             let size = (
-                contextSize: max(512, config.contextSize / shrink),
-                batchSize: max(64, config.batchSize / shrink)
+                contextSize: max(512, config.contextSize / attempt.shrink),
+                batchSize: max(64, config.batchSize / attempt.shrink)
             )
 
             var contextParams = llama_context_default_params()
@@ -413,11 +429,12 @@ enum LlamaError: LocalizedError {
         case .modelLoadFailed(let name):
             return "Could not load \(name). The install may be damaged."
         case .contextCreationFailed(let availableMB, let thermal):
-            // 「可能是内存不够」谁看了都没用 —— 既不能确认，也不知道该做什么。
-            // 把失败当时的两个数字写出来：还剩多少额度、机器有多烫。
-            return "Not enough memory to prepare the model. "
-                + "\(availableMB) MB of this app's budget was free and the device was \(thermal). "
-                + "Close some apps or let the phone cool down, then try again."
+            // 不替 llama.cpp 断言原因。上一版这里写的是「内存不够」，而真实现场是
+            // 空着 2 GB、机器 cool —— 那句话把人往错的方向带了整整一天。
+            // 只报两个数字，剩下的留给读的人判断。
+            return "Could not prepare the GPU. "
+                + "\(availableMB) MB free, device \(thermal). "
+                + "This usually clears up on the next launch."
         case .tokenizationFailed:
             return "Tokenization failed."
         case .decodeFailed(let code):
@@ -427,6 +444,13 @@ enum LlamaError: LocalizedError {
         case .promptTooLong(let promptTokens, let contextSize):
             return "Prompt too long: \(promptTokens) tokens, limit \(contextSize)."
         }
+    }
+}
+
+private extension Duration {
+    var seconds: Double {
+        let (whole, attos) = components
+        return Double(whole) + Double(attos) * 1e-18
     }
 }
 
