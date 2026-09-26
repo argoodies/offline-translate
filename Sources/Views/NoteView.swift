@@ -263,8 +263,15 @@ struct NoteView: View {
             .contentShape(Rectangle())
     }
 
-    /// 长按一段弹出来的操作。只给图形，不给词 —— 朗读、拷贝、分享这三个
-    /// 系统图标本身就够认，VoiceOver 那边另有说明（accessibilityLabel 不显示在屏幕上）。
+    /// 长按一段弹出来的操作。
+    ///
+    /// 这里是全 app 唯一一处「无字」原则不适用的地方。别处去掉词是因为界面自己
+    /// 会说话 —— 一个输入框、一根进度条，形状就是说明。而系统的 context menu
+    /// 天生是「一行图标 + 一行字」的版式：只给 `Image`，那行字不会消失，只会变空，
+    /// 于是三行菜单看着像是没加载出来。这不是克制，是坏掉。
+    ///
+    /// 用 `Label` 而不是 Image 加 `accessibilityLabel`：前者一份文字同时供屏幕和
+    /// VoiceOver 用，不会哪天改了一处忘了另一处。
     @ViewBuilder
     private func actions(for message: ChatMessage) -> some View {
         if !message.text.isEmpty {
@@ -272,21 +279,21 @@ struct NoteView: View {
             Button {
                 speech.toggle(messageID: message.id, text: message.text)
             } label: {
-                Image(systemName: speaking ? "stop.circle" : "speaker.wave.2")
+                Label(
+                    speaking ? "Stop" : "Read aloud",
+                    systemImage: speaking ? "stop.circle" : "speaker.wave.2"
+                )
             }
-            .accessibilityLabel(speaking ? "Stop reading" : "Read aloud")
 
             Button {
                 UIPasteboard.general.string = message.text
             } label: {
-                Image(systemName: "doc.on.doc")
+                Label("Copy", systemImage: "doc.on.doc")
             }
-            .accessibilityLabel("Copy")
 
             ShareLink(item: message.text) {
-                Image(systemName: "square.and.arrow.up")
+                Label("Share", systemImage: "square.and.arrow.up")
             }
-            .accessibilityLabel("Share")
         }
     }
 
