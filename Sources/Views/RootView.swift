@@ -37,9 +37,9 @@ struct RootView: View {
                 finishShown = false
                 return
             }
-            // 就绪了先别急着换屏：条子滑满，底下那句话说完，停一秒再走。
-            // 这一秒是这个 app 唯一一次主动提「它不用网」的机会 —— 进了正文页之后
-            // 满屏都是留白和图形，没有地方讲这件事，而这恰恰是它唯一的卖点。
+            // 就绪了先别急着换屏：条子滑满，底下亮出那句副标题，停两秒再走。
+            // 这两秒是这个 app 唯一一次交代自己是什么的机会 —— 进了正文页之后
+            // 满屏都是留白和图形，没有地方讲这件事。
             guard phase == .ready, !finishShown else { return }
             finishShown = true
             progressAtFinish = scriptedProgress(at: Date())
@@ -140,7 +140,10 @@ struct RootView: View {
     /// 就绪后条子滑到 100% 用的时间。
     private static let finishRamp: TimeInterval = 0.35
     /// 满格之后停留多久再进正文页。
-    private static let finishHold: TimeInterval = 1
+    ///
+    /// 两秒。一秒不够读完底下那句话 —— 而那句话是这一屏唯一的目的，
+    /// 等了半分钟的人不差这一秒，看不清才亏。
+    private static let finishHold: TimeInterval = 2
 
     /// 如实写现在在干什么。
     ///
@@ -151,7 +154,10 @@ struct RootView: View {
     /// 没写「Compiling shaders」是因为那只有第一次成立，之后走系统缓存 ——
     /// 每次都那么说就是假话了。
     private var loadingCaption: String {
-        if holdingFinish { return "Ready. No connection needed, ever." }
+        // 就绪那两秒里显示的就是 App Store 上的副标题，一字不差。
+        // 那句话本来就是为「一行说清这是什么」写的，没理由在 app 里另写一句 ——
+        // 商店上看到的和装完看到的是同一句，中间不掉链子。
+        if holdingFinish { return AppSettings.tagline }
         switch engine.loadStage {
         case .weights: return "Reading \(BundledModel.displayName) weights"
         case .preparingContext: return "Preparing the GPU"

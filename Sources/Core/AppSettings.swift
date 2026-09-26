@@ -12,6 +12,12 @@ enum AppSettings {
     /// 带着感叹号 —— 跟主屏幕图标下面、App Store 上的写法保持一致。
     /// 三处不一样的话，同一个 app 会显得有三个名字。
     static let title = "QW!"
+    /// App Store 上的副标题，一字不差。
+    ///
+    /// 加载走完那两秒会把它显示出来 —— 商店上看到的和装完看到的是同一句，
+    /// 中间不掉链子。改这里的话记得同步改 App Store Connect 上的副标题，
+    /// 那边改不了代码，这边也读不到那边。
+    static let tagline = "Qwen3.5-0.8B on your device"
     /// 交给 Metal 的层数，用来在「启动快」和「出字快」之间取舍。
     ///
     /// 99（全部）启动最慢：全量 offload 会逼着 500 MB 权重在加载时全部落地。
