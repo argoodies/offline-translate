@@ -18,6 +18,19 @@ set -euo pipefail
 # 升级步骤：改这里 → 跑一次本脚本 → 按 include/llama.h 的 diff 修 LlamaBridge.swift。
 LLAMA_REF="${LLAMA_REF:-b11158}"
 
+# 着色器在构建期编好，不要留到运行时。
+#
+# 上游默认 ON，而这个开关的名字有误导性：ON 是把 Metal **源码**嵌进二进制，
+# 首次运行再调 newLibraryWithSource 现场编译几百个 kernel —— 在手机 GPU 上从头编
+# 一遍，装完第一次要等好几分钟，界面就停在「Preparing the GPU」一动不动。
+# 编完进系统着色器缓存，所以第二次开就是秒进。
+#
+# OFF 让 cmake 在构建期产出 default.metallib，上游脚本会把它拷进 framework，
+# 运行时直接加载。前提是那个文件真的能跟着进 app 包 —— project.yml 里
+# llama.xcframework 是 embed: true，所以能。下面会校验，拷丢了就当场失败，
+# 而不是等到装到手机上才发现 Metal 起不来。
+export GGML_METAL_EMBED_LIBRARY="${GGML_METAL_EMBED_LIBRARY:-OFF}"
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK_DIR="${WORK_DIR:-$ROOT/.build}"
 SOURCE_DIR="$WORK_DIR/llama.cpp-$LLAMA_REF"
@@ -43,6 +56,16 @@ echo "==> 安装到 Vendor/"
 mkdir -p "$ROOT/Vendor"
 rm -rf "$OUTPUT"
 cp -R "$SOURCE_DIR/build-apple/llama.xcframework" "$OUTPUT"
+
+if [[ "$GGML_METAL_EMBED_LIBRARY" == "OFF" ]]; then
+    echo "==> 校验 default.metallib 是否在 framework 里"
+    if ! find "$OUTPUT" -name '*.metallib' -print -quit | grep -q .; then
+        echo "错误：EMBED_LIBRARY=OFF 但 framework 里没有 .metallib。" >&2
+        echo "      运行时会找不到着色器，Metal 后端起不来 —— 这里就停，别让它上机器。" >&2
+        exit 1
+    fi
+    find "$OUTPUT" -name '*.metallib'
+fi
 
 echo "==> 完成：$OUTPUT"
 ls "$OUTPUT"

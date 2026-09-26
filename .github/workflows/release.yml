@@ -28,6 +28,9 @@ on:
 env:
   # 必须和 scripts/build-llama-xcframework.sh 里的默认值一致，否则缓存会认错版本。
   LLAMA_REF: b11158
+  # 着色器是构建期编还是运行时编。这个也得进缓存键 —— 只改脚本不改键的话，
+  # CI 会心安理得地复用上一次编出来的 xcframework，改动等于没发生。
+  METAL_EMBED: "OFF"
   MODEL_KEY: Qwen3.5-0.8B-Q4_K_M
   TEAM_ID: "9TGD35M5GT"
   SCHEME: QW
@@ -57,10 +60,12 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: Vendor/llama.xcframework
-          key: llama-xcframework-${{ env.LLAMA_REF }}-${{ runner.os }}
+          key: llama-xcframework-${{ env.LLAMA_REF }}-metal${{ env.METAL_EMBED }}-${{ runner.os }}
 
       - name: Build llama.xcframework
         if: steps.llama-cache.outputs.cache-hit != 'true'
+        env:
+          GGML_METAL_EMBED_LIBRARY: ${{ env.METAL_EMBED }}
         run: ./scripts/build-llama-xcframework.sh
 
       - name: Save llama.xcframework
@@ -68,7 +73,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: Vendor/llama.xcframework
-          key: llama-xcframework-${{ env.LLAMA_REF }}-${{ runner.os }}
+          key: llama-xcframework-${{ env.LLAMA_REF }}-metal${{ env.METAL_EMBED }}-${{ runner.os }}
 
       # 模型权重不在仓库里（507 MB，超过 GitHub 单文件上限），构建前现拉一份。
       - name: Restore model weights
