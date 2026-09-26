@@ -86,16 +86,22 @@ struct RootView: View {
                     .scaledToFit()
                     .frame(width: 112, height: 112)
 
+                // 条和文案共用一个时钟：文案也要随时间变（等久了要改口），
+                // 不能只靠状态驱动。
                 TimelineView(.periodic(from: .now, by: 1.0 / 30)) { timeline in
-                    LoadingBar(progress: scriptedProgress(at: timeline.date))
-                        .frame(width: 180, height: 4)
-                }
-                .frame(width: 180, height: 4)
+                    VStack(spacing: 22) {
+                        LoadingBar(progress: scriptedProgress(at: timeline.date))
+                            .frame(width: 180, height: 4)
 
-                Text(loadingCaption)
-                    .font(.footnote)
-                    .foregroundStyle(Palette.inkSecondary)
-                    .animation(.easeOut(duration: 0.2), value: loadingCaption)
+                        Text(loadingCaption(at: timeline.date))
+                            .font(.footnote)
+                            .foregroundStyle(Palette.inkSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                            .animation(.easeOut(duration: 0.25), value: loadingCaption(at: timeline.date))
+                    }
+                }
+                .frame(width: 280, height: 70)
             }
         }
         // 整屏可敲。等半分钟太无聊了，而一块戳下去有反应的屏幕，至少不像死的。
@@ -150,19 +156,36 @@ struct RootView: View {
     /// 第一句连模型名一起报出来。这半分钟里读的到底是什么，是这一屏唯一值得说的事 ——
     /// 而且名字取自 `BundledModel`，换了模型文案自己跟着变，不会说谎。
     ///
-    /// 「Preparing the GPU」是在分配 KV cache、建计算图，首次启动还要编 Metal 内核。
-    /// 没写「Compiling shaders」是因为那只有第一次成立，之后走系统缓存 ——
-    /// 每次都那么说就是假话了。
-    private var loadingCaption: String {
+    /// 第二句分两段。平时就是「Preparing the GPU」；等过 20 秒才改口提着色器编译 ——
+    /// 那件事只有装完第一次会发生，每次都那么说就是假话，但真碰上了不说也是害人。
+    /// 用等待时长来分，而不是猜「这是不是第一次」，因为前者是事实、后者要存状态。
+    private func loadingCaption(at now: Date) -> String {
         // 就绪那两秒里显示的就是 App Store 上的副标题，一字不差。
         // 那句话本来就是为「一行说清这是什么」写的，没理由在 app 里另写一句 ——
         // 商店上看到的和装完看到的是同一句，中间不掉链子。
         if holdingFinish { return AppSettings.tagline }
+
         switch engine.loadStage {
-        case .weights: return "Reading \(BundledModel.displayName) weights"
-        case .preparingContext: return "Preparing the GPU"
+        case .weights:
+            return "Reading \(BundledModel.displayName) weights"
+
+        case .preparingContext:
+            // 这一步在装完第一次运行时会非常久：llama.cpp 的 Metal 内核是运行时
+            // 从源码编出来的（`GGML_METAL_EMBED_LIBRARY=ON`），几百个 kernel 在手机
+            // GPU 上从头编一遍。编完进系统缓存，所以以后每次都是几秒。
+            //
+            // 卡在同一句话上几分钟，跟死机没有区别 —— 而它其实在干活，只是干的活
+            // 一辈子只干这一次。超过 20 秒就改口说清楚：说明白了，人愿意等；
+            // 不说，人只会以为坏了然后去删 app。
+            let waited = now.timeIntervalSince(gpuStartedAt ?? now)
+            return waited > Self.longWaitAfter
+                ? "Building GPU shaders. This happens once, on the first launch, and can take a few minutes."
+                : "Preparing the GPU"
         }
     }
+
+    /// 建上下文等到多久就改口。
+    private static let longWaitAfter: TimeInterval = 20
 
     /// 加载失败给条退路。否则只能杀掉 app 重开 —— 而重开多半也是同样的结果。
     ///
