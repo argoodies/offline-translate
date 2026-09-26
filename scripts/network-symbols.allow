@@ -1,0 +1,16 @@
+# 允许出现在二进制里的网络符号。每一行都要说清楚凭什么放行。
+#
+# 「出现」不等于「会被调用」。第三方包里没走到的代码一样会被链接进来，
+# 而 iOS 那个联网授权弹窗是真发起连接时才弹的，不是看符号表。所以这里放行的
+# 标准是：这条代码路径确实到不了，并且有办法保证它到不了。
+#
+# 加一行之前先问：是我自己调的，还是别人库里带的？自己调的一律不放行。
+
+# MarkdownUI 的 DefaultImageProvider —— 渲染 ![](https://…) 时用 URLSession 去拉图。
+# 它是 markdownImageProvider 这个 environment 的默认值，所以哪怕没人用也会被链接。
+# 走不到的保证在 QWApp.swift：两个 provider 都在根视图上钉成 .asset，
+# 整棵视图树都拿不到默认值。
+_$sSo12NSURLSessionC10FoundationE4data4from8delegateAC4DataV_So13NSURLResponseCtAC3URLV_So0A12TaskDelegate_pSgtYaKF
+_$sSo12NSURLSessionC10FoundationE4data4from8delegateAC4DataV_So13NSURLResponseCtAC3URLV_So0A12TaskDelegate_pSgtYaKFTu
+_OBJC_CLASS_$_NSURLSession
+_OBJC_CLASS_$_NSURLSessionConfiguration

@@ -167,10 +167,7 @@ struct NoteView: View {
     private func answerBody(_ text: String) -> some View {
         Markdown(MarkdownStabilizer.stabilized(text))
             .markdownTheme(.note)
-            // 本地模型不会产出图片链接，而且这个 app 不联网 —— 换成只读 asset 的
-            // provider，彻底堵死 MarkdownUI 默认的远程图片加载。
-            .markdownImageProvider(.asset)
-            .markdownInlineImageProvider(.asset)
+            // 图片 provider 钉在 QWApp 的根上，不在这里 —— 见那里的注释。
             .textSelection(.enabled)
             // 逐字放行本来就柔和，再把随之而来的换行、重排缓一下，
             // 整体才是"浮出来"而不是"弹出来"。

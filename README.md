@@ -58,9 +58,17 @@ open QW.xcodeproj
 
 **不强制离线。** 早先的版本在联网时会挡住对话，逼用户去开飞行模式 —— 判定基于 `NWPathMonitor`，而 iOS 允许 Wi-Fi 独立于飞行模式开着并自动重连，于是「我明明开了飞行模式却进不去」成了常态。那道关卡已经拆掉：app 本来就不发任何网络请求，离线是事实而不需要靠拦人来证明。
 
-**这件事由构建来保证，不靠自觉。** `scripts/check-no-network.sh` 在归档之后直接验二进制：`otool -L` 看有没有链接 CFNetwork / Network.framework，`nm -u` 看有没有引用 `NSURLSession`、`_nw_connection` 这类符号，再扫一遍 Info.plist 里有没有 `NSAppTransportSecurity` 之类的声明。任何一条命中就让构建失败。
+**这件事由构建来保证，不靠自觉。** `scripts/check-no-network.sh` 在归档之后跑，分两道。
 
-加这道检查是因为「不联网」在 diff 里看不出来：一个 `AsyncImage`、一个埋点 SDK、或者 MarkdownUI 的 image provider 退回默认值去拉远端图片，代码 review 很容易放过，但 app 在中国区会弹「想要使用无线局域网与蜂窝网络」—— 弹出来的那一刻，商店页第一句话就成了假的。
+对我们自己写的代码，直接扫源码，一个 `URLSession`、`NWPathMonitor`、`AsyncImage` 都不许有。这一道最准。
+
+对依赖就不能这么粗暴了。第一次跑这个检查就挂在 `NSURLSession` 上 —— 来自 MarkdownUI 的 `DefaultImageProvider`，它是 `markdownImageProvider` 这个 environment 的默认值，所以哪怕没人用也会被链接进来。链接进来不等于会被调用，而那个联网授权弹窗是真发起连接时才弹的。所以二进制这一道改成跟 `scripts/network-symbols.allow` 比基线：对不上才挂，而基线里每一行都要写清楚凭什么放行。同时也报「基线里列了但二进制里已经没有」的行，免得它一直挂着假装还在挡什么。
+
+那条放行的保证落在 `QWApp.swift`：两个 image provider 钉在**根视图**上，不是钉在渲染 Markdown 的那个视图上。整棵树都拿不到默认值，将来多一处渲染的地方也不会漏 —— 钉在调用点上，漏掉是迟早的事。
+
+另外还看 `otool -L` 有没有直接链接 CFNetwork / Network.framework，以及 Info.plist 里有没有 `NSAppTransportSecurity` 这类声明。
+
+加这道检查是因为「不联网」在 diff 里看不出来：一个 `AsyncImage`、一个埋点 SDK、或者哪个依赖换了默认实现去拉远端资源，代码 review 很容易放过，但 app 在中国区会弹「想要使用无线局域网与蜂窝网络」—— 弹出来的那一刻，商店页第一句话就成了假的。
 
 同理，朗读只从 `AVSpeechSynthesisVoice.speechVoices()` 里挑已装好的语音，不用 `AVSpeechSynthesisVoice(language:)`。后者返回那个语言的**默认**语音，可能是还没下载的增强音或 Siri 音，拿它去 speak 系统会替 app 去取。
 
