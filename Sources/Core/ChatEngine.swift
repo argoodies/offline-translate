@@ -81,25 +81,43 @@ final class ChatEngine: ObservableObject {
         config.temperature = Float(AppSettings.temperature)
         config.topP = Float(AppSettings.topP)
 
-        do {
-            try await bridge.load(modelPath: url.path, config: config) { progress in
-                Task { @MainActor [weak self] in
-                    self?.loadProgress = progress
+        // 两轮。第一轮失败之后把 llama.cpp 的后端整个推倒重来，再走一遍。
+        //
+        // 这是照着症状来的：刚装完第一次打不开，按重试按钮还是打不开，但**重启 app
+        // 就好了**。重试和重启的唯一差别就是后端有没有重新 init —— 它全进程只跑一次，
+        // 而且不管立没立起来都记成已就绪（见 `LlamaBridge.resetBackend`）。
+        // 所以第一轮失败时，自己在原地做一遍换进程才会做的事。
+        //
+        // 第二轮要重读那半个 G，慢，但只在本来就打不开的时候付这个钱。
+        var lastError: Error?
+
+        for pass in 0..<2 {
+            do {
+                try await bridge.load(modelPath: url.path, config: config) { progress in
+                    Task { @MainActor [weak self] in
+                        self?.loadProgress = progress
+                    }
+                } onPreparingContext: {
+                    Task { @MainActor [weak self] in
+                        self?.loadStage = .preparingContext
+                    }
                 }
-            } onPreparingContext: {
-                Task { @MainActor [weak self] in
-                    self?.loadStage = .preparingContext
-                }
+                loadedModelPath = url.path
+                modelDescription = await bridge.modelInfo()?.description
+                invalidateContext()
+                loadProgress = 1
+                phase = .ready
+                return
+            } catch {
+                lastError = error
+                // 界面上不回退到「Reading weights」：条子已经爬到 90% 了，退回去看着
+                // 像出了事。第二轮在「Preparing the GPU」底下悄悄跑完就行。
+                if pass == 0 { await bridge.resetBackend() }
             }
-            loadedModelPath = url.path
-            modelDescription = await bridge.modelInfo()?.description
-            invalidateContext()
-            loadProgress = 1
-            phase = .ready
-        } catch {
-            loadedModelPath = nil
-            phase = .loadFailed(error.localizedDescription)
         }
+
+        loadedModelPath = nil
+        phase = .loadFailed(lastError?.localizedDescription ?? "Unknown error")
     }
 
     /// 标记 KV cache 不再可信，下次发消息会重建。

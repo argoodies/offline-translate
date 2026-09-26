@@ -195,6 +195,23 @@ actor LlamaBridge {
         buildSampler()
     }
 
+    /// 把 llama.cpp 的后端整个推倒重来。
+    ///
+    /// 「重试按钮没用、重启 app 就好了」—— 这两件事的差别全在这儿。`llama_backend_init`
+    /// 被下面那个静态标志挡着，全进程只跑一次，而且不管立没立起来都记成 true。
+    /// 第一次没把 Metal 后端立起来的话，同一个进程里再怎么重试都是在用那个坏的；
+    /// 只有换个进程才会重新 init 一次 —— 于是「重启就好了」。
+    ///
+    /// 这个方法就是在原地做一遍换进程才会做的事。代价是之后要重读那半个 G，
+    /// 只在失败路径上付。
+    func resetBackend() {
+        unload()
+        if Self.backendReady {
+            llama_backend_free()
+            Self.backendReady = false
+        }
+    }
+
     func unload() {
         if let sampler {
             llama_sampler_free(sampler)
