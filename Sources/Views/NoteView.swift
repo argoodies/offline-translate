@@ -100,11 +100,17 @@ struct NoteView: View {
                 .onChange(of: store.currentID) { _ in scrollToBottom(proxy, animated: false) }
                 // 冷启动直接落在一页有内容的笔记上时，上面那几个 onChange 一个都不会触发。
                 // 有内容的笔记不自动落笔，所以进来看到的第一眼就是它的初始位置 ——
-                // 那一眼该是最后写到的地方，不是半年前的开头。等一拍是为了让布局先算完，
-                // 高度还没定下来就滚，滚不到底。
+                // 那一眼该是最后写到的地方，不是半年前的开头。
+                //
+                // 滚好几次，不是一次。这一下跟加载页淡出的转场撞在一起，正文的高度
+                // 还没算完 —— 这时候发出去的 scrollTo 会被安静地吞掉，什么也不做，
+                // 也不报错。多试几遍跨过整个转场；内容没变的时候反复滚到同一处
+                // 没有任何副作用，滚到了就是白跑几次循环。
                 .task {
-                    try? await Task.sleep(for: .milliseconds(120))
-                    scrollToBottom(proxy, animated: false)
+                    for gap in [0, 120, 200, 300, 500] {
+                        if gap > 0 { try? await Task.sleep(for: .milliseconds(gap)) }
+                        scrollToBottom(proxy, animated: false)
+                    }
                 }
             }
         }
