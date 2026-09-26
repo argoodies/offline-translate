@@ -32,12 +32,15 @@ final class ChatEngine: ObservableObject {
     /// 上一次生成因为超长被裁掉了早期对话。
     @Published private(set) var didTrimHistory = false
     @Published private(set) var modelDescription: String?
-    /// 模型加载进度，0…1。半个 GB 的权重要读好几秒，界面得有个交代。
+    /// llama.cpp 报的权重读取进度，0…1。
+    ///
+    /// 界面上那根条不用它 —— 那根是按时间编排的（见 `RootView.scriptedProgress`）。
+    /// 这个值留着是因为它是真的：要判断加载到底卡在哪儿，得看它而不是看条子。
     @Published private(set) var loadProgress: Double = 0
 
     /// 加载现在走到哪一步了。界面照着这个如实写，不编。
     enum LoadStage {
-        /// 从包里读权重。这一步占 0…0.9，有真实进度。
+        /// 从包里读权重。只有这一步 llama.cpp 会报真实进度。
         case weights
         /// 建上下文：分配 KV cache、建计算图，首次启动还要编 Metal 内核。
         /// 这一步 llama.cpp 不报进度，只能说一声在做。
@@ -81,11 +84,7 @@ final class ChatEngine: ObservableObject {
         do {
             try await bridge.load(modelPath: url.path, config: config) { progress in
                 Task { @MainActor [weak self] in
-                    // 权重只是第一段。回调跑完之后还要建上下文 —— 分配 KV cache，
-                    // 首次启动还要编译 Metal 内核 —— 那一段 llama.cpp 不报进度。
-                    // 映射到 0…0.9，末尾留给它：进度条停在 90% 是实话，
-                    // 停在 100% 却还要等，是在说已经好了。
-                    self?.loadProgress = progress * 0.9
+                    self?.loadProgress = progress
                 }
             } onPreparingContext: {
                 Task { @MainActor [weak self] in

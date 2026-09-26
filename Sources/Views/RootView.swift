@@ -3,6 +3,11 @@ import SwiftUI
 struct RootView: View {
     @EnvironmentObject private var engine: ChatEngine
 
+    /// 这一轮加载是什么时候开始的。进度条按它算，不按 llama.cpp 报的数。
+    @State private var loadStartedAt = Date()
+    /// 权重读完、开始建上下文的时刻。
+    @State private var gpuStartedAt: Date?
+
     var body: some View {
         Group {
             if let modelURL = BundledModel.url {
@@ -13,6 +18,15 @@ struct RootView: View {
             }
         }
         .animation(.easeOut(duration: 0.25), value: engine.phase)
+        // 重试也是一轮新的加载，两个锚点都要重新起算。
+        .onChange(of: engine.phase) { phase in
+            guard phase == .loadingModel else { return }
+            loadStartedAt = Date()
+            gpuStartedAt = nil
+        }
+        .onChange(of: engine.loadStage) { stage in
+            if stage == .preparingContext, gpuStartedAt == nil { gpuStartedAt = Date() }
+        }
     }
 
     /// 模型没就绪就不构建对话界面 —— 不是拿遮罩盖住，是根本不存在。
@@ -32,9 +46,9 @@ struct RootView: View {
 
     /// 首次启动要把半 GB 权重读进来，得有一阵。
     ///
-    /// 进度来自 llama.cpp 的加载回调，不是假动画；文案也不糊弄 —— 两步各说各的，
-    /// 因为这两步的体感完全不同：读权重有进度可看，建上下文那一步什么都不动，
-    /// 只说「Loading」的话正好在最难熬的那几秒里显得像卡死了。
+    /// 进度条是编排出来的，不是真实进度 —— 理由见 `scriptedProgress`。
+    /// 文案倒是如实的：两步各说各的，因为这两步的体感完全不同，
+    /// 统称一句「Loading」会让最难熬的那几秒显得像卡死。
     private var loadingScreen: some View {
         // ignoresSafeArea 要加在 ZStack 上而不是那层底色上。只染底色的话，
         // ZStack 自己仍然被安全区框着，内容居中的是安全区 —— 刘海和 Home 指示条
@@ -47,8 +61,11 @@ struct RootView: View {
                     .scaledToFit()
                     .frame(width: 112, height: 112)
 
-                LoadingBar(progress: engine.loadProgress)
-                    .frame(width: 180, height: 4)
+                TimelineView(.periodic(from: .now, by: 1.0 / 30)) { timeline in
+                    LoadingBar(progress: scriptedProgress(at: timeline.date))
+                        .frame(width: 180, height: 4)
+                }
+                .frame(width: 180, height: 4)
 
                 Text(loadingCaption)
                     .font(.footnote)
@@ -62,6 +79,34 @@ struct RootView: View {
         .onTapGesture { Haptics.idleTap() }
         .ignoresSafeArea()
     }
+
+    /// 进度条走的是时间，不是 llama.cpp 报的进度。
+    ///
+    /// 真实进度看着糟糕，原因不在数字不准，在两段的形状对不上体感：读权重那段
+    /// 忽快忽慢，建上下文那段完全没有回调 —— 于是条子先抽搐一阵，再彻底停住。
+    /// 停住的进度条比慢更像崩溃。
+    ///
+    /// 换成按时间匀速爬：读权重一分钟爬到 50%，进入建上下文直接跳到 90%，
+    /// 再用十秒挪到 95%。剩下那 5% 留给真正就绪的那一刻 —— 条子永远不会先到头
+    /// 再干等，那是最招人烦的一种。
+    ///
+    /// 代价要认：这是假的。快的机器上条子会比实际慢，慢的机器上会比实际快。
+    /// 它诚实的地方只剩一处 —— 走完 95% 那一下是真就绪，不是定时器到点。
+    private func scriptedProgress(at now: Date) -> Double {
+        switch engine.loadStage {
+        case .weights:
+            let t = now.timeIntervalSince(loadStartedAt) / Self.weightsRamp
+            return 0.5 * min(1, max(0, t))
+        case .preparingContext:
+            let t = now.timeIntervalSince(gpuStartedAt ?? now) / Self.gpuRamp
+            return 0.9 + 0.05 * min(1, max(0, t))
+        }
+    }
+
+    /// 读权重那段爬到 50% 用的时间。
+    private static let weightsRamp: TimeInterval = 60
+    /// 建上下文那段从 90% 挪到 95% 用的时间。
+    private static let gpuRamp: TimeInterval = 10
 
     /// 如实写现在在干什么。
     ///
@@ -131,11 +176,10 @@ struct RootView: View {
 
 /// 加载进度条。
 ///
-/// 换掉系统的 `ProgressView` 是为了那道扫光。llama.cpp 只在读权重时报进度，
-/// 之后建上下文那一段完全没有回调 —— 条会一动不动地停在 90%，而静止的进度条
-/// 比慢更像死机。扫光跟进度无关，只要还在加载就一直横穿，说明这事还在进行。
+/// 换掉系统的 `ProgressView` 是为了那道扫光 —— 它跟进度无关，只要还在加载就一直
+/// 横穿，哪怕填充宽度不动也说明这事还在进行。
 ///
-/// 填充宽度仍然是真实进度，一格没有多给。
+/// 填充宽度由 `RootView.scriptedProgress` 给，是时间编排出来的，不是真实进度。
 private struct LoadingBar: View {
     let progress: Double
 
@@ -160,13 +204,13 @@ private struct LoadingBar: View {
 
                 Capsule()
                     .fill(Palette.ink)
-                    // 就是真实进度，0% 就是零宽。一度给过 4pt 的下限，好让扫光有地方
-                    // 可扫；后来扫光改成横穿整条，空轨道自己就有动静了，下限只剩下
+                    // 0% 就是零宽。一度给过 4pt 的下限，好让扫光有地方可扫；
+                    // 后来扫光改成横穿整条，空轨道自己就有动静了，下限只剩下
                     // 「一上来就已经加载了一截」这个假象。
                     .frame(width: filled)
-                    // 回调按 1% 一跳，直接改宽度是一格一格地蹦；
-                    // 缓动之后是滑过去的，也顺带把跳变的间隙填上了。
-                    .animation(.easeOut(duration: 0.45), value: progress)
+                    // 不加隐式动画：值本身就是 30fps 连续推的，已经够滑；
+                    // 再套一层缓动只会让条子恒定落后半秒，而且 50% 跳到 90%
+                    // 那一下本来就该是「直接跳」。
                     .overlay(alignment: .leading) {
                         // 已填充那一段的扫光。底色是实心黑，反过来要提亮。
                         sweep(Palette.canvas.opacity(0.5), band: band, travel: width)

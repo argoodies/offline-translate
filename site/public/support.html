@@ -21,7 +21,7 @@
   <p>Tapping between paragraphs you have already written just moves the cursor; it will not send anything.</p>
 
   <h2>The first launch takes a few seconds</h2>
-  <p>Half a gigabyte of model weights has to be mapped into memory before anything can run. A progress bar shows the real figure reported by the inference engine, not an animation. Later launches are faster because the file is already warm.</p>
+  <p>Half a gigabyte of model weights has to be mapped into memory before anything can run. The progress bar is paced on a timer rather than on the engine's own figures, which arrive unevenly and then stop entirely for the last stretch. Later launches are faster because the file is already warm.</p>
 
   <h2>Replies are slow</h2>
   <p>Speed depends almost entirely on the chip. On recent iPhones the model runs at conversational speed; on older devices it is noticeably slower, and there is no server to offload to. Shorter conversations also help — every reply re-reads the context above it.</p>
