@@ -65,12 +65,15 @@ struct RootView: View {
 
     /// 如实写现在在干什么。
     ///
-    /// 「Reading weights」就是在从包里读那 507 MB；「Preparing the GPU」是在分配
-    /// KV cache、建计算图，首次启动还要编 Metal 内核。没写「Compiling shaders」是
-    /// 因为那只有第一次成立，之后走的是系统缓存 —— 每次都那么说就是假话了。
+    /// 第一句连模型名一起报出来。这半分钟里读的到底是什么，是这一屏唯一值得说的事 ——
+    /// 而且名字取自 `BundledModel`，换了模型文案自己跟着变，不会说谎。
+    ///
+    /// 「Preparing the GPU」是在分配 KV cache、建计算图，首次启动还要编 Metal 内核。
+    /// 没写「Compiling shaders」是因为那只有第一次成立，之后走系统缓存 ——
+    /// 每次都那么说就是假话了。
     private var loadingCaption: String {
         switch engine.loadStage {
-        case .weights: return "Reading weights"
+        case .weights: return "Reading \(BundledModel.displayName) weights"
         case .preparingContext: return "Preparing the GPU"
         }
     }

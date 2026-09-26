@@ -128,10 +128,19 @@ struct NoteView: View {
         .contextMenu { actions(for: message) }
     }
 
-    /// 正在写出来的回答。
+    /// 正在写出来的回答，末尾跟着一颗跳动的点。
+    ///
+    /// 点落在下一行的行首 —— 也就是下一段字将要出现的地方。它不是光标（那个之前
+    /// 撤掉了，静止的竖线在流式输出里只是干扰），是「还没写完」的信号：
+    /// 模型卡壳几秒不出字的时候，屏幕上唯一还在动的就是它。
     private var answerInProgress: some View {
-        answerBody(engine.streamingText)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 10) {
+            if !engine.streamingText.isEmpty {
+                answerBody(engine.streamingText)
+            }
+            BouncingDot()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// 模型回答的正文。
@@ -376,4 +385,35 @@ private extension Theme {
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .markdownMargin(top: 6, bottom: 12)
         }
+}
+
+/// 输出位置上那颗跳动的点。
+///
+/// 一边弹一边明暗：只弹的话在纯白底上太硬，只闪的话又像故障灯。两个动画
+/// 同一个时钟、同一段时长，所以是"浮起来的时候亮，落下去的时候暗"，
+/// 像有东西在呼吸，而不是两个效果各跳各的。
+private struct BouncingDot: View {
+    @State private var up = false
+
+    private static let size: CGFloat = 7
+    private static let lift: CGFloat = 5
+    private static let period = 0.55
+
+    var body: some View {
+        Circle()
+            .fill(Palette.ink)
+            .frame(width: Self.size, height: Self.size)
+            .opacity(up ? 1 : 0.3)
+            .offset(y: up ? -Self.lift : 0)
+            // 占位高度算上弹起的幅度，否则点一跳整段正文跟着抖。
+            .frame(height: Self.size + Self.lift, alignment: .bottom)
+            .onAppear {
+                withAnimation(
+                    .easeInOut(duration: Self.period).repeatForever(autoreverses: true)
+                ) {
+                    up = true
+                }
+            }
+            .accessibilityHidden(true)
+    }
 }
