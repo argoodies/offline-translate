@@ -159,6 +159,12 @@ jobs:
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 
+      # 「不发任何网络请求」是这个 app 的卖点，也是隐私页上的承诺。归档一出来
+      # 就对着二进制验一遍，别等到装到手机上弹联网授权才发现。
+      - name: Verify the app cannot reach the network
+        if: env.NEEDS_ARCHIVE == 'true'
+        run: ./scripts/check-no-network.sh "$RUNNER_TEMP/QW.xcarchive/Products/Applications/QW.app"
+
       # 先出 ad-hoc 下载页，再上 TestFlight。顺序是有意的：上传那步会撞 App Store
       # Connect 的每日配额（409），而一个步骤挂了后面的就不跑了 —— 排在后面的话，
       # 一次配额用尽会连带把下载页也赔进去。下载页这边没有配额，先把它落地。

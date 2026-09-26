@@ -55,18 +55,32 @@ final class SpeechReader: NSObject, ObservableObject {
     }
 
     /// 按回复本身的语言挑语音 —— 模型会跟着用户的语言走，不能假定是中文。
+    ///
+    /// 只从 `speechVoices()` 里挑，不用 `AVSpeechSynthesisVoice(language:)`。
+    /// 后者给的是那个语言的**默认**语音，可能是台上还没下载的增强音或 Siri 音 ——
+    /// 真拿它去 speak，系统会替这个 app 去取，于是弹出联网授权。而这个 app
+    /// 对外说的就是「不发任何网络请求」，为一句朗读把这句话作废不值得。
+    /// `speechVoices()` 列的是设备上已经装好的，念出来一定是离线的。
     private static func voice(for text: String) -> AVSpeechSynthesisVoice? {
         let recognizer = NLLanguageRecognizer()
         recognizer.processString(text)
-        guard let language = recognizer.dominantLanguage else {
-            return AVSpeechSynthesisVoice(language: Locale.preferredLanguages.first)
+        let tag = recognizer.dominantLanguage?.rawValue
+            ?? Locale.preferredLanguages.first
+            ?? "en-US"
+
+        let installed = AVSpeechSynthesisVoice.speechVoices().filter {
+            // Siri 和 Personal Voice 走的是另一套合成，不保证在本地。
+            !$0.identifier.lowercased().contains("siri")
+                && !$0.identifier.lowercased().contains("personalvoice")
         }
-        if let exact = AVSpeechSynthesisVoice(language: language.rawValue) {
+
+        // 先找完全匹配，再退到只看语言码 —— NLLanguage 有时给的是带脚本的码
+        // （zh-Hans），系统语音库里不一定有同名的。
+        if let exact = installed.first(where: { $0.language == tag }) {
             return exact
         }
-        // NLLanguage 有时给的是带脚本的码（zh-Hans），系统语音库里不一定有同名的。
-        let prefix = String(language.rawValue.prefix(2))
-        return AVSpeechSynthesisVoice.speechVoices().first { $0.language.hasPrefix(prefix) }
+        let prefix = String(tag.prefix(2))
+        return installed.first { $0.language.hasPrefix(prefix) }
     }
 
     /// 把 Markdown 标记去掉再朗读。不处理会听到一堆「井号井号」「星号星号」。

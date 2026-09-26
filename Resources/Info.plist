@@ -22,7 +22,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<!-- 只用 HTTPS 下载模型，不含任何自研加密，声明一下可以跳过每次 TestFlight 的出口合规问卷。 -->
+	<!-- 不含任何自研加密（模型随包安装，连下载都没有），声明一下可以跳过每次
+	     TestFlight 的出口合规问卷。 -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

@@ -25,7 +25,6 @@ Sources/
     ChatEngine.swift      编排：加载模型、复用或重建 KV cache、跑生成
     Conversation.swift    消息与会话模型，本地 JSON 存储
     BundledModel.swift    定位 bundle 里的权重文件
-    NetworkGate.swift     NWPathMonitor，判断当前是否离线
     Palette.swift         全 app 的黑白灰配色，跟随深浅色
     Haptics.swift         触觉反馈
     StreamPacer.swift     把模型的突发输出摊平成匀速显示
@@ -58,6 +57,12 @@ open QW.xcodeproj
 **上下文满了自动裁剪。** 装不下就丢掉最早的一轮问答重建，直到能放下，并在顶栏用一条细线显示余量。悄悄丢历史比明说更糟 —— 用户会觉得模型突然失忆。
 
 **不强制离线。** 早先的版本在联网时会挡住对话，逼用户去开飞行模式 —— 判定基于 `NWPathMonitor`，而 iOS 允许 Wi-Fi 独立于飞行模式开着并自动重连，于是「我明明开了飞行模式却进不去」成了常态。那道关卡已经拆掉：app 本来就不发任何网络请求，离线是事实而不需要靠拦人来证明。
+
+**这件事由构建来保证，不靠自觉。** `scripts/check-no-network.sh` 在归档之后直接验二进制：`otool -L` 看有没有链接 CFNetwork / Network.framework，`nm -u` 看有没有引用 `NSURLSession`、`_nw_connection` 这类符号，再扫一遍 Info.plist 里有没有 `NSAppTransportSecurity` 之类的声明。任何一条命中就让构建失败。
+
+加这道检查是因为「不联网」在 diff 里看不出来：一个 `AsyncImage`、一个埋点 SDK、或者 MarkdownUI 的 image provider 退回默认值去拉远端图片，代码 review 很容易放过，但 app 在中国区会弹「想要使用无线局域网与蜂窝网络」—— 弹出来的那一刻，商店页第一句话就成了假的。
+
+同理，朗读只从 `AVSpeechSynthesisVoice.speechVoices()` 里挑已装好的语音，不用 `AVSpeechSynthesisVoice(language:)`。后者返回那个语言的**默认**语音，可能是还没下载的增强音或 Siri 音，拿它去 speak 系统会替 app 去取。
 
 **配色跟随系统深浅色。** 整套黑白灰在深色下原样翻过来，用户气泡始终是界面上唯一的大块反色。取色用 `UIColor` 的动态构造而不是两个静态 `Color` —— 系统切换外观时它自己重算，不用在每个视图里读 `colorScheme` 再手动挑一个。灰阶全部用中性灰而不是系统那套 `systemGray`，后者带蓝调，铺在纯白上能看出偏色。app 内的 Logo 是张黑色图，按 template 渲染再染成前景色，否则深色下会糊在黑底上。
 
